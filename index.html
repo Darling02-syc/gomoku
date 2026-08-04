@@ -19,15 +19,19 @@ let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false,aiMode=true,de
 const D4=[[1,0],[0,1],[1,1],[1,-1]];
 
 c.addEventListener('click',e=>{
-  if(over||!aiMode||turn!=1)return;
+  if(over)return;
+  if(aiMode&&turn!=1)return;
   const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
   if(x<0||x>=N||y<0||y>=N||b[y][x])return;
-  place(x,y);if(!over)aiMove();
+  place(x,y);if(!over&&aiMode)aiMove();
 });
 
 function place(x,y){
-  b[y][x]=turn;draw();if(win(x,y,turn)){sEl.textContent=(turn==1?'⚫ 你':'⚪ AI')+' 获胜！';over=true;return}
-  turn=turn==1?2:1;sEl.textContent=(turn==1?'⚫ 你的回合':'⚪ AI 思考中...');
+  b[y][x]=turn;draw();
+  let w=win(x,y,turn);
+  if(w){sEl.textContent=(turn==1?'⚫':'⚪')+(aiMode?(turn==1?' 你':' AI'):'')+' 获胜！';over=true;return}
+  turn=turn==1?2:1;
+  sEl.textContent=aiMode?(turn==1?'⚫ 你的回合':'⚪ AI 思考中...'):(turn==1?'⚫ 黑棋回合':'⚪ 白棋回合');
 }
 
 function get(x,y){return b[y]&&b[y][x]!=null?b[y][x]:-1}
@@ -139,58 +143,58 @@ function search(d,alpha,beta,mx){
 }
 
 function aiMove(){
-  let lv=+ds.value,moves=getMoves(2),bx=7,by=7;
+  setTimeout(()=>{
+    let lv=+ds.value,moves=getMoves(2),bx=7,by=7;
 
-  // Instant: win or block
-  let w=hasWin(2);if(w){setTimeout(()=>{if(!over)place(w[0],w[1]);},50);return;}
-  w=hasWin(1);if(w){setTimeout(()=>{if(!over)place(w[0],w[1]);},50);return;}
-  let f=hasFour(1);if(f){setTimeout(()=>{if(!over)place(f[0],f[1]);},50);return;}
+    // Instant: win or block
+    let w=hasWin(2);if(w){place(w[0],w[1]);return;}
+    w=hasWin(1);if(w){place(w[0],w[1]);return;}
+    let f=hasFour(1);if(f){place(f[0],f[1]);return;}
 
-  // Score & sort
-  let scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
-  scored.sort((a,b)=>b.s-a.s);
+    // Score & sort
+    let scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
+    scored.sort((a,b)=>b.s-a.s);
 
-  if(lv<=1){
-    let best=-Infinity;
-    for(let{x,y,s:v}of scored){
-      if(lv===0)v+=Math.random()*3000;
-      if(v>best){best=v;bx=x;by=y;}
-    }
-  }else{
-    // Iterative deepening with time limit
-    let maxDepth=[0,0,8,20][lv];
-    let topN=[0,0,50,30][lv];
-    let timeLimit=[0,0,2000,4000][lv];
-    let cands=scored.slice(0,topN);
-    let best=-Infinity;
-
-    for(let d=2;d<=maxDepth;d+=2){
-      deadline=Date.now()+timeLimit;
-      aborted=false;
-      let roundBest=-Infinity,rbx=bx,rby=by;
-
-      for(let{x,y}of cands){
-        if(Date.now()>deadline){aborted=true;break;}
-        b[y][x]=2;
-        let sc=search(d-1,-Infinity,Infinity,false);
-        b[y][x]=0;
-        if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}
+    if(lv<=1){
+      let best=-Infinity;
+      for(let{x,y,s:v}of scored){
+        if(lv===0)v+=Math.random()*3000;
+        if(v>best){best=v;bx=x;by=y;}
       }
+    }else{
+      let maxDepth=[0,0,8,20][lv];
+      let topN=[0,0,50,30][lv];
+      let timeLimit=[0,0,2000,4000][lv];
+      let cands=scored.slice(0,topN);
+      let best=-Infinity;
 
-      if(!aborted){best=roundBest;bx=rbx;by=rby;}
-      // Re-sort candidates by this depth's scores for better next-iteration ordering
-      if(!aborted&&d<maxDepth){
-        let results=cands.map(({x,y})=>{
-          b[y][x]=2;let sc=search(Math.min(1,d-1),-Infinity,Infinity,false);b[y][x]=0;
-          return{x,y,s:sc};
-        });
-        results.sort((a,b)=>b.s-a.s);
-        cands=results.map(({x,y})=>({x,y}));
+      for(let d=2;d<=maxDepth;d+=2){
+        deadline=Date.now()+timeLimit;
+        aborted=false;
+        let roundBest=-Infinity,rbx=bx,rby=by;
+
+        for(let{x,y}of cands){
+          if(Date.now()>deadline){aborted=true;break;}
+          b[y][x]=2;
+          let sc=search(d-1,-Infinity,Infinity,false);
+          b[y][x]=0;
+          if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}
+        }
+
+        if(!aborted){best=roundBest;bx=rbx;by=rby;}
+        if(!aborted&&d<maxDepth){
+          let results=cands.map(({x,y})=>{
+            b[y][x]=2;let sc=search(Math.min(1,d-1),-Infinity,Infinity,false);b[y][x]=0;
+            return{x,y,s:sc};
+          });
+          results.sort((a,b)=>b.s-a.s);
+          cands=results.map(({x,y})=>({x,y}));
+        }
+        if(d>=maxDepth||aborted||best>9e7)break;
       }
-      if(d>=maxDepth||aborted||best>9e7)break;
     }
-  }
-  setTimeout(()=>{if(!over)place(bx,by);},50);
+    if(!over)place(bx,by);
+  },50);
 }
 
 function draw(){
@@ -207,7 +211,7 @@ function win(x,y,p){
   return false;
 }
 
-document.getElementById('r').addEventListener('click',()=>{b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;sEl.textContent='⚫ 你的回合';draw();if(!aiMode)aiMode=true;});
+document.getElementById('r').addEventListener('click',()=>{b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;sEl.textContent=aiMode?'⚫ 你的回合':'⚫ 黑棋回合';draw();});
 const ab=document.getElementById('a');
 ab.addEventListener('click',()=>{aiMode=!aiMode;ab.textContent=aiMode?'双人模式':'AI 对战';if(aiMode)sEl.textContent='⚫ 你的回合';else sEl.textContent='⚫ 黑棋回合';b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;draw();});
 draw();
