@@ -15,7 +15,7 @@ canvas{border:2px solid #8b7355;border-radius:4px;cursor:pointer}
 <select id="d"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select></div>
 <script>
 const N=15,S=36,c=document.getElementById('c'),ctx=c.getContext('2d'),sEl=document.getElementById('s'),ds=document.getElementById('d');
-let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false,aiMode=true,nodes=0;
+let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false,aiMode=true,deadline=0,aborted=false;
 const D4=[[1,0],[0,1],[1,1],[1,-1]];
 
 c.addEventListener('click',e=>{
@@ -30,144 +30,9 @@ function place(x,y){
   turn=turn==1?2:1;sEl.textContent=(turn==1?'⚫ 你的回合':'⚪ AI 思考中...');
 }
 
-// ── Board utilities ──
 function get(x,y){return b[y]&&b[y][x]!=null?b[y][x]:-1}
 function wouldWin(x,y,p){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;return w;}
 
-// ── Static threat analysis (no recursion, extremely fast) ──
-// Returns {win, four, open4, dbl3, open3, rush4} counts for player p
-function threats(p){
-  let r={four:[],open3:[],rush4:[],dbl3:0,win:false};
-  let o3set=new Set();
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){
-    for(let[dx,dy]of D4){
-      // Check if placing p at (x,y) creates a winning line
-      b[y][x]=p;
-      if(win(x,y,p)){b[y][x]=0;r.win=true;return r;}
-      // Count pattern
-      let c=0,o1=0,o2=0;
-      for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0){o1++;}break}}
-      for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0){o2++;}break}}
-      b[y][x]=0;
-      let oe=o1+o2;
-      if(c>=4&&oe>=1){r.four.push([x,y]);}
-      else if(c===3&&oe===2){
-        let k=y*N+x;
-        if(!o3set.has(k)){o3set.add(k);r.open3.push([x,y]);}
-      }else if(c===3&&oe===1){r.rush4.push([x,y]);}
-    }
-  }
-  // Count double-open-3 threats (two open-3s from same cell)
-  let m3=new Map();
-  for(let[x,y]of r.open3){let k=y*N+x;m3.set(k,(m3.get(k)||0)+1);}
-  for(let[_,c]of m3)if(c>=2)r.dbl3++;
-  return r;
-}
-
-// ── Quiescence: resolve forcing sequences at leaf nodes ──
-function qsearch(alpha,beta,mx){
-  nodes++;
-  let p=mx?2:1, t=threats(p);
-  // If current player can win immediately, return win score
-  if(t.win)return mx?1e9+pDist():-1e9-pDist();
-  // If current player has unblockable threats, it's very good
-  if(t.four.length>0)return mx?8e8:-8e8;
-  if(t.dbl3>0)return mx?7e8:-7e8;
-
-  let op=mx?1:2, ot=threats(op);
-  // Opponent can win → must block
-  if(ot.win)return mx?-1e9-pDist():1e9+pDist();
-  // Opponent has forcing threats → continue quiescence
-  if(ot.four.length>0||ot.dbl3>0){
-    // Try blocking each opponent threat
-    let blocks=new Set();
-    if(ot.four.length>0)blocks.add(ot.four[0][1]*N+ot.four[0][0]);
-    for(let[x,y]of ot.open3)blocks.add(y*N+x);
-    let best=mx?-Infinity:Infinity;
-    for(let k of blocks){
-      let bx=k%N,by=Math.floor(k/N);
-      b[by][bx]=p;
-      let sc=qsearch(alpha,beta,!mx);
-      b[by][bx]=0;
-      if(mx){if(sc>best)best=sc;if(best>alpha)alpha=best;}
-      else{if(sc<best)best=sc;if(best<beta)beta=best;}
-      if(alpha>=beta)break;
-    }
-    if(best!==(mx?-Infinity:Infinity))return best;
-  }
-  return evalBoard();
-}
-
-function pDist(){return 0;} // small tiebreaker
-
-// ── Main search with threat-aware extensions ──
-function search(d,alpha,beta,mx){
-  nodes++;
-  if(d<=0)return qsearch(alpha,beta,mx);
-
-  let p=mx?2:1;
-
-  // Immediate win check
-  let moves=getMoves(1);
-  let scored=moves.map(([x,y])=>{
-    let s=0;
-    for(let[dx,dy]of D4){
-      b[y][x]=p;if(win(x,y,p)){b[y][x]=0;s=1e9;break;}
-      b[y][x]=0;
-      // Quick pattern check
-      let c1=0,o1=0;
-      for(let i=1;i<=4;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c1++;else{if(v===0)o1++;break}}
-      for(let i=1;i<=4;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c1++;else{if(v===0)o1++;break}}
-      if(c1>=3)s+=c1===3?5000:c1===4?5e4:0;
-      // Also check blocking opponent
-      let op=mx?1:2,c2=0,o2=0;
-      for(let i=1;i<=4;i++){let v=get(x+dx*i,y+dy*i);if(v===op)c2++;else{if(v===0)o2++;break}}
-      for(let i=1;i<=4;i++){let v=get(x-dx*i,y-dy*i);if(v===op)c2++;else{if(v===0)o2++;break}}
-      if(c2>=3)s+=c2===3?4000:c2===4?4e4:0;
-      s+=(14-Math.abs(x-7)-Math.abs(y-7))*3;
-    }
-    return{x,y,s};
-  });
-  scored.sort((a,b)=>b.s-a.s);
-
-  let bestV=mx?-Infinity:Infinity, any=false;
-  let limit=Math.min(scored.length,d<=4?20:15);
-
-  for(let i=0;i<limit;i++){
-    let{x,y}=scored[i];
-    b[y][x]=p;
-    let ext=0;
-    // Threat extension: if this creates a forcing threat, search deeper
-    let t=threats(p);
-    if(t.win){b[y][x]=0;return mx?1e9:(-1e9);}
-    if(t.four.length>0||t.dbl3>0)ext=2;
-    else if(t.open3.length>=2)ext=1;
-
-    let sc=search(d-1+ext,alpha,beta,!mx);
-    b[y][x]=0;any=true;
-
-    if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}
-    else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}
-    if(alpha>=beta)break;
-  }
-  if(!any)return evalBoard();
-  return bestV;
-}
-
-// ── Candidate generation ──
-function getMoves(rng){
-  let set=new Set(),m=[];
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
-    for(let dy=-rng;dy<=rng;dy++)for(let dx=-rng;dx<=rng;dx++){
-      let ny=y+dy,nx=x+dx;
-      if(nx>=0&&nx<N&&ny>=0&&ny<N&&!b[ny][nx])set.add(ny*N+nx);
-    }
-  if(!set.size){let c=7;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)set.add((c+dy)*N+(c+dx));}
-  for(let k of set)m.push([k%N,Math.floor(k/N)]);
-  return m;
-}
-
-// ── Position evaluation ──
 function lineScore(x,y,p){
   let t=0;
   for(let[dx,dy]of D4){
@@ -180,59 +45,154 @@ function lineScore(x,y,p){
     else if(c===4&&e===0)t+=5e4;
     else if(c===3&&e===2)t+=8e4;
     else if(c===3&&e===1)t+=8000;
-    else if(c===3&&e===0)t+=200;
     else if(c===2&&e===2)t+=3000;
     else if(c===2&&e===1)t+=500;
-    else if(c===2&&e===0)t+=30;
     else if(c===1&&e===2)t+=200;
-    else if(c===1&&e===1)t+=40;
   }
   return t;
 }
 
 function evalBoard(){
   let t=0;
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x]){
-    let s=lineScore(x,y,b[y][x]);
-    t+=b[y][x]===2?s:-s;
-  }
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
+    t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);
   return t;
 }
 
-// ── Main AI entry ──
+// Simplified threat check (much faster, just what we need)
+function hasWin(p){
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;if(w)return[x,y];}
+  return null;
+}
+function hasFour(p){
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){
+    for(let[dx,dy]of D4){
+      let c=0,o1=0,o2=0;
+      b[y][x]=p;
+      for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}
+      for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}
+      b[y][x]=0;
+      if(c>=4&&(o1+o2)>=1)return[x,y];
+    }
+  }
+  return null;
+}
+
+// Fast heuristic for move ordering
+function quickScore(x,y,p){
+  let s=0;
+  for(let[dx,dy]of D4){
+    let c=0,e=0;
+    for(let i=1;i<=4;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)e++;break}}
+    for(let i=1;i<=4;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)e++;break}}
+    if(c>=3&&e>=1)s+=50000;
+    else if(c===2&&e>=1)s+=2000;
+    else if(c===1&&e>=1)s+=200;
+    s+=c*10;
+  }
+  return s+(14-Math.abs(x-7)-Math.abs(y-7))*5;
+}
+
+function getMoves(rng){
+  let set=new Set(),m=[];
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
+    for(let dy=-rng;dy<=rng;dy++)for(let dx=-rng;dx<=rng;dx++){
+      let ny=y+dy,nx=x+dx;
+      if(nx>=0&&nx<N&&ny>=0&&ny<N&&!b[ny][nx])set.add(ny*N+nx);
+    }
+  if(!set.size){let c=7;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)set.add((c+dy)*N+(c+dx));}
+  for(let k of set)m.push([k%N,Math.floor(k/N)]);
+  return m;
+}
+
+// Time-checked search
+function search(d,alpha,beta,mx){
+  if(Date.now()>deadline){aborted=true;return evalBoard();}
+  if(d<=0)return evalBoard();
+
+  let p=mx?2:1,moves=getMoves(1);
+  // Sort moves by quick heuristic
+  let scored=moves.map(([x,y])=>({x,y,s:quickScore(x,y,p)+quickScore(x,y,mx?1:2)*0.9}));
+  scored.sort((a,b)=>b.s-a.s);
+
+  let bestV=mx?-Infinity:Infinity,any=false;
+  let limit=Math.min(scored.length,18);
+
+  for(let i=0;i<limit;i++){
+    let{x,y}=scored[i];
+    // Check if this move wins immediately
+    b[y][x]=p;
+    if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1000:(-1e8-d*1000);}
+    b[y][x]=0;
+
+    b[y][x]=p;
+    let sc=search(d-1,alpha,beta,!mx);
+    b[y][x]=0;any=true;
+
+    if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}
+    else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}
+    if(alpha>=beta)break;
+    if(aborted)break;
+  }
+  if(!any)return evalBoard();
+  return bestV;
+}
+
 function aiMove(){
-  let lv=+ds.value,moves=getMoves(2),best=-Infinity,bx=7,by=7;
-  nodes=0;
+  let lv=+ds.value,moves=getMoves(2),bx=7,by=7;
 
-  // Quick scan: can we win or must we block?
-  for(let[x,y]of moves)if(wouldWin(x,y,2)){setTimeout(()=>{if(!over)place(x,y);},50);return;}
-  for(let[x,y]of moves)if(wouldWin(x,y,1)){setTimeout(()=>{if(!over)place(x,y);},50);return;}
+  // Instant: win or block
+  let w=hasWin(2);if(w){setTimeout(()=>{if(!over)place(w[0],w[1]);},50);return;}
+  w=hasWin(1);if(w){setTimeout(()=>{if(!over)place(w[0],w[1]);},50);return;}
+  let f=hasFour(1);if(f){setTimeout(()=>{if(!over)place(f[0],f[1]);},50);return;}
 
-  // Score and sort
+  // Score & sort
   let scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
   scored.sort((a,b)=>b.s-a.s);
 
   if(lv<=1){
+    let best=-Infinity;
     for(let{x,y,s:v}of scored){
       if(lv===0)v+=Math.random()*3000;
       if(v>best){best=v;bx=x;by=y;}
     }
   }else{
-    let depth=[0,0,6,10][lv];
-    let topN=[0,0,60,40][lv];
+    // Iterative deepening with time limit
+    let maxDepth=[0,0,8,20][lv];
+    let topN=[0,0,50,30][lv];
+    let timeLimit=[0,0,2000,4000][lv];
     let cands=scored.slice(0,topN);
+    let best=-Infinity;
 
-    for(let{x,y}of cands){
-      b[y][x]=2;
-      let sc=search(depth-1,-Infinity,Infinity,false);
-      b[y][x]=0;
-      if(sc>best){best=sc;bx=x;by=y;}
+    for(let d=2;d<=maxDepth;d+=2){
+      deadline=Date.now()+timeLimit;
+      aborted=false;
+      let roundBest=-Infinity,rbx=bx,rby=by;
+
+      for(let{x,y}of cands){
+        if(Date.now()>deadline){aborted=true;break;}
+        b[y][x]=2;
+        let sc=search(d-1,-Infinity,Infinity,false);
+        b[y][x]=0;
+        if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}
+      }
+
+      if(!aborted){best=roundBest;bx=rbx;by=rby;}
+      // Re-sort candidates by this depth's scores for better next-iteration ordering
+      if(!aborted&&d<maxDepth){
+        let results=cands.map(({x,y})=>{
+          b[y][x]=2;let sc=search(Math.min(1,d-1),-Infinity,Infinity,false);b[y][x]=0;
+          return{x,y,s:sc};
+        });
+        results.sort((a,b)=>b.s-a.s);
+        cands=results.map(({x,y})=>({x,y}));
+      }
+      if(d>=maxDepth||aborted||best>9e7)break;
     }
   }
   setTimeout(()=>{if(!over)place(bx,by);},50);
 }
 
-// ── Draw & win ──
 function draw(){
   ctx.fillStyle='#dcb468';ctx.fillRect(0,0,540,540);
   ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
@@ -247,7 +207,6 @@ function win(x,y,p){
   return false;
 }
 
-// ── Buttons ──
 document.getElementById('r').addEventListener('click',()=>{b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;sEl.textContent='⚫ 你的回合';draw();if(!aiMode)aiMode=true;});
 const ab=document.getElementById('a');
 ab.addEventListener('click',()=>{aiMode=!aiMode;ab.textContent=aiMode?'双人模式':'AI 对战';if(aiMode)sEl.textContent='⚫ 你的回合';else sEl.textContent='⚫ 黑棋回合';b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;draw();});
