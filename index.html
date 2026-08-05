@@ -80,6 +80,16 @@ function playClick(){
   f.type='bandpass';f.frequency.value=1200;f.Q.value=.8;
   o.connect(f);f.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.08);
 }
+function playWin(){
+  if(!audioCtx)return;
+  let t=audioCtx.currentTime,notes=[523,659,784,1047],dur=.18;
+  notes.forEach((freq,i)=>{
+    let o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='triangle';o.frequency.value=freq;
+    g.gain.setValueAtTime(.25,t+i*dur);g.gain.exponentialRampToValueAtTime(.001,t+i*dur+dur*.8);
+    o.connect(g);g.connect(audioCtx.destination);o.start(t+i*dur);o.stop(t+i*dur+dur);
+  });
+}
 
 // ═══════════ Particle system ═══════════
 function spawnParticles(){
@@ -175,7 +185,7 @@ function doMove(x,y){
     if(mode===0)w+=turn===1?' 你获胜！':' AI 获胜！';
     else if(mode===2)w+=turn===myColor?' 你获胜！':' 对手获胜！';
     else w+=' 获胜！';
-    sEl.textContent=w;sEl.className='win';over=true;spawnParticles();return;
+    sEl.textContent=w;sEl.className='win';over=true;playWin();spawnParticles();return;
   }
   turn=turn===1?2:1;
   if(mode===0)sEl.textContent=turn===1?'⚫ 你的回合':'⚪ AI 思考中...';
@@ -230,7 +240,7 @@ function initOnline(){
   extraEl.innerHTML='房间: <b>'+roomId+'</b>'+(isHost?' <button id="share" onclick="shareRoom()">📋 分享房间</button>':'');
   client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clientId:'gomoku_'+Math.random().toString(36).substring(2,10)});let topic='gomoku/'+roomId;
   client.on('connect',()=>{client.subscribe(topic);sEl.textContent=isHost?'等待对手加入... (你执 ⚫)':'已加入！等待 ⚫ 黑棋落子';turn=1;onlineReady=false;});
-  client.on('message',(t,msg)=>{let d;try{d=JSON.parse(msg.toString());}catch(e){return;}if(d.s===myColor)return;if(d.t==='join'&&isHost){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;client.publish(topic,JSON.stringify({t:'ack',s:myColor}));}if(d.t==='ack'&&!isHost){sEl.textContent='已连接！等待 ⚫ 黑棋落子';onlineReady=true;}if(d.t==='reset'){newBoard();draw();sEl.className='';sEl.textContent=isHost?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}if(d.t==='move'&&!over){let op=isHost?2:1;b[d.y][d.x]=op;lastX=d.x;lastY=d.y;turn=myColor;playClick();startPulse();draw();if(win(d.x,d.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';sEl.className='win';over=true;onlineReady=false;spawnParticles();return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}});
+  client.on('message',(t,msg)=>{let d;try{d=JSON.parse(msg.toString());}catch(e){return;}if(d.s===myColor)return;if(d.t==='join'&&isHost){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;client.publish(topic,JSON.stringify({t:'ack',s:myColor}));}if(d.t==='ack'&&!isHost){sEl.textContent='已连接！等待 ⚫ 黑棋落子';onlineReady=true;}if(d.t==='reset'){newBoard();draw();sEl.className='';sEl.textContent=isHost?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}if(d.t==='move'&&!over){let op=isHost?2:1;b[d.y][d.x]=op;lastX=d.x;lastY=d.y;turn=myColor;playClick();startPulse();draw();if(win(d.x,d.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';sEl.className='win';over=true;onlineReady=false;playWin();spawnParticles();return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}});
   client.on('error',()=>{sEl.textContent='连接失败，请重试';onlineReady=false;});
   if(!isHost)setTimeout(()=>{client.publish(topic,JSON.stringify({t:'join',s:myColor}));},800);
 }
