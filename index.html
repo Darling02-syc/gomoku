@@ -232,6 +232,8 @@ function aiMove(){
 }
 
 // ── Online ──
+const PEER_CFG={host:'0.peerjs.com',port:443,secure:true,debug:0,
+  config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]}};
 function initOnline(){
   let params=new URLSearchParams(window.location.search),rid=params.get('room');
   if(rid){joinRoom(rid);}else{createRoom();}
@@ -239,17 +241,25 @@ function initOnline(){
 function createRoom(){
   isHost=true;myColor=1;roomId=Math.random().toString(36).substring(2,8).toUpperCase();
   extraEl.innerHTML='房间: <b>'+roomId+'</b> <button id="share" onclick="shareRoom()">📋 分享房间</button>';
-  peer=new Peer(roomId,{host:'0.peerjs.com',port:443,secure:true,debug:0});
+  peer=new Peer(roomId,PEER_CFG);
   peer.on('open',()=>{sEl.textContent='等待对手加入...';});
-  peer.on('connection',c=>{conn=c;setupConn();});
-  peer.on('error',()=>{sEl.textContent='连接失败，请重试';});
+  peer.on('connection',c=>{conn=c;setupConn();sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';});
+  peer.on('error',e=>{sEl.textContent='连接失败: '+e.type;});
+  peer.on('disconnected',()=>{sEl.textContent='与服务器断开，正在重连...';peer.reconnect();});
 }
 function joinRoom(rid){
   isHost=false;myColor=2;roomId=rid;
   extraEl.innerHTML='房间: <b>'+rid+'</b>';
-  peer=new Peer({host:'0.peerjs.com',port:443,secure:true,debug:0});
-  peer.on('open',()=>{sEl.textContent='正在加入...';conn=peer.connect(rid,{reliable:true});setupConn();});
-  peer.on('error',()=>{sEl.textContent='加入失败，请检查房间码';});
+  peer=new Peer(PEER_CFG);
+  peer.on('open',()=>{
+    sEl.textContent='正在连接对手...';
+    conn=peer.connect(rid,{reliable:true});
+    setupConn();
+    // Timeout: if not connected in 15s, show error
+    setTimeout(()=>{if(conn&&!conn.open){sEl.textContent='连接超时，请确认房间码正确且对方在线';}},15000);
+  });
+  peer.on('error',e=>{sEl.textContent='加入失败: '+e.type;});
+  peer.on('disconnected',()=>{sEl.textContent='与服务器断开，正在重连...';peer.reconnect();});
 }
 function shareRoom(){
   let base=location.href.split('?')[0];
