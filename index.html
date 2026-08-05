@@ -57,7 +57,7 @@ canvas{border:2px solid #8b7355;border-radius:4px;cursor:pointer}
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/mqtt@5.7.0/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
 <script>
 const N=15,S=36,D4=[[1,0],[0,1],[1,1],[1,-1]];
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
@@ -67,7 +67,7 @@ const extraEl=document.getElementById('extra'),toastEl=document.getElementById('
 let b,turn,over,mode,lastX,lastY;
 let deadline=0,aborted=false,nodes=0;
 // Online (MQTT)
-let client=null,isHost=false,roomId='',myColor=1;
+let client=null,isHost=false,roomId='',myColor=1,onlineReady=false;
 // AI
 let diff=1,pendingDiff=0;
 
@@ -112,7 +112,7 @@ canvas.addEventListener('click',e=>{
   if(over)return;
   if(mode===0&&turn!==1)return;
   if(mode===2&&turn!==myColor)return;
-  if(mode===2&&!client)return;
+  if(mode===2&&!onlineReady)return;
   const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
   if(x<0||x>=N||y<0||y>=N||b[y][x])return;
   doMove(x,y);
@@ -242,18 +242,18 @@ function initOnline(){
   client.on('connect',()=>{
     client.subscribe(topic);
     sEl.textContent=isHost?'等待对手加入... (你执 ⚫)':'已加入！等待 ⚫ 黑棋落子';
-    turn=1;
+    turn=1;onlineReady=false;
   });
   client.on('message',(t,msg)=>{
     let d;try{d=JSON.parse(msg.toString());}catch(e){return;}
     if(d.s===myColor)return;
-    if(d.t==='join'&&isHost){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;client.publish(topic,JSON.stringify({t:'ack',s:myColor}));}
-    if(d.t==='ack'&&!isHost){sEl.textContent='已连接！等待 ⚫ 黑棋落子';}
-    if(d.t==='reset'){newBoard();draw();sEl.textContent=isHost?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;}
-    if(d.t==='move'&&!over){let op=isHost?2:1;b[d.y][d.x]=op;lastX=d.x;lastY=d.y;turn=myColor;draw();if(win(d.x,d.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}
+    if(d.t==='join'&&isHost){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;client.publish(topic,JSON.stringify({t:'ack',s:myColor}));}
+    if(d.t==='ack'&&!isHost){sEl.textContent='已连接！等待 ⚫ 黑棋落子';onlineReady=true;}
+    if(d.t==='reset'){newBoard();draw();sEl.textContent=isHost?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}
+    if(d.t==='move'&&!over){let op=isHost?2:1;b[d.y][d.x]=op;lastX=d.x;lastY=d.y;turn=myColor;draw();if(win(d.x,d.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;onlineReady=false;return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}
   });
-  client.on('error',()=>{sEl.textContent='连接失败，请重试';});
-  if(!isHost)setTimeout(()=>{client.publish(topic,JSON.stringify({t:'join',s:myColor}));},500);
+  client.on('error',()=>{sEl.textContent='连接失败，请重试';onlineReady=false;});
+  if(!isHost)setTimeout(()=>{client.publish(topic,JSON.stringify({t:'join',s:myColor}));},800);
 }
 function shareRoom(){
   let base=location.href.split('?')[0];
@@ -261,7 +261,7 @@ function shareRoom(){
   navigator.clipboard.writeText(base+'?room='+roomId).then(()=>{showToast('房间码已复制，分享给好友吧！');});
 }
 function sendMove(x,y){if(client)client.publish('gomoku/'+roomId,JSON.stringify({t:'move',x,y,s:myColor}));}
-function cleanupOnline(){if(client){client.end();client=null;}isHost=false;roomId='';}
+function cleanupOnline(){if(client){client.end();client=null;}isHost=false;roomId='';onlineReady=false;}
 
 // ── Toast ──
 function showToast(msg){toastEl.textContent=msg;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),2000);}
@@ -276,8 +276,8 @@ function doReset(){
   newBoard();
   if(mode===2){
     if(client)client.publish('gomoku/'+roomId,JSON.stringify({t:'reset',s:myColor}));
-    if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}
-    else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}
+    if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;}
+    else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}
   }else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}
   draw();
 }
