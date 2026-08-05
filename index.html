@@ -252,13 +252,17 @@ function joinRoom(rid){
   peer.on('error',()=>{sEl.textContent='加入失败，请检查房间码';});
 }
 function shareRoom(){
-  let link=location.origin+location.pathname+'?room='+roomId;
-  navigator.clipboard.writeText(link).then(()=>{showToast('房间码已复制，分享给好友吧！');});
+  let base=location.href.split('?')[0];
+  if(base.startsWith('file://'))base='https://darling02-syc.github.io/gomoku/';
+  navigator.clipboard.writeText(base+'?room='+roomId).then(()=>{showToast('房间码已复制，分享给好友吧！');});
 }
 function setupConn(){
   function onOpen(){if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}}
   if(conn.open){onOpen();}else{conn.on('open',onOpen);}
-  conn.on('data',data=>{if(data.t==='move'&&!over){let op=isHost?2:1;b[data.y][data.x]=op;lastX=data.x;lastY=data.y;turn=myColor;draw();if(win(data.x,data.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}});
+  conn.on('data',data=>{
+    if(data.t==='reset'){newBoard();draw();if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}return;}
+    if(data.t==='move'&&!over){let op=isHost?2:1;b[data.y][data.x]=op;lastX=data.x;lastY=data.y;turn=myColor;draw();if(win(data.x,data.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}
+  });
   conn.on('close',()=>{sEl.textContent='连接已断开';conn=null;});
 }
 function sendMove(x,y){if(conn)conn.send({t:'move',x,y});}
@@ -275,7 +279,11 @@ function goHome(){
 }
 function doReset(){
   newBoard();
-  if(mode===2){cleanupOnline();initOnline();}else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}
+  if(mode===2){
+    if(conn)conn.send({t:'reset'});
+    if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}
+    else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}
+  }else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}
   draw();
 }
 
