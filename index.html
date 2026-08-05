@@ -70,8 +70,8 @@ let client=null,isHost=false,roomId='',myColor=1,onlineReady=false;
 let diff=1,pendingDiff=0;
 
 // ═══════════ Audio Engine ═══════════
-let audioCtx=null,bgmGain=null,bgmOn=false;
-function initAudio(){if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();bgmGain=audioCtx.createGain();bgmGain.gain.value=.12;bgmGain.connect(audioCtx.destination);}}
+let audioCtx=null;
+function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
 function playClick(){
   if(!audioCtx)return;
   let t=audioCtx.currentTime,g=audioCtx.createGain(),o=audioCtx.createOscillator(),f=audioCtx.createBiquadFilter();
@@ -80,25 +80,6 @@ function playClick(){
   f.type='bandpass';f.frequency.value=1200;f.Q.value=.8;
   o.connect(f);f.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.08);
 }
-function startBGM(){
-  if(bgmOn||!audioCtx)return;bgmOn=true;
-  let notes=[262,294,330,392,440,523,587,660,784,880]; // pentatonic-ish C4-C6
-  let seq=[0,2,4,7,9,7,4,2,0,2,4,7,5,2,7,4,0,4,7,9,7,4,2,0,-1,2,4,7,5,9,7,4]; // pattern with rests
-  let pos=0,beat=.7;
-  function playNote(){
-    if(!bgmOn)return;
-    let n=seq[pos%seq.length];
-    if(n>=0){
-      let t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();
-      o.type='sine';o.frequency.value=notes[n%notes.length];
-      g.gain.setValueAtTime(.5,t);g.gain.exponentialRampToValueAtTime(.001,t+beat*.85);
-      o.connect(g);g.connect(bgmGain);o.start(t);o.stop(t+beat*.9);
-    }
-    pos++;setTimeout(playNote,beat*1000);
-  }
-  playNote();
-}
-function stopBGM(){bgmOn=false;}
 
 // ═══════════ Particle system ═══════════
 function spawnParticles(){
@@ -154,7 +135,7 @@ function animPulse(ts){
 function newBoard(){b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;stoneAnim=0;particles=[];if(particleRAF){cancelAnimationFrame(particleRAF);particleRAF=null;}if(pulseRAF){cancelAnimationFrame(pulseRAF);pulseRAF=null;}}
 
 function startGame(m){
-  initAudio();if(!bgmOn)startBGM();
+  initAudio();
   mode=m;homeEl.style.display='none';gameEl.style.display='block';
   newBoard();draw();
   document.getElementById('reset').style.display='inline-block';
@@ -261,7 +242,7 @@ function cleanupOnline(){if(client){client.end();client=null;}isHost=false;roomI
 function showToast(msg){toastEl.textContent=msg;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),2000);}
 
 // ═══════════ Navigation ═══════════
-function goHome(){if(mode===2)cleanupOnline();stopBGM();homeEl.style.display='block';gameEl.style.display='none';extraEl.innerHTML='';}
+function goHome(){if(mode===2)cleanupOnline();homeEl.style.display='block';gameEl.style.display='none';extraEl.innerHTML='';}
 function doReset(){newBoard();sEl.className='';if(mode===2){if(client)client.publish('gomoku/'+roomId,JSON.stringify({t:'reset',s:myColor}));if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;}else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}}else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}draw();}
 
 // ═══════════ Draw ═══════════
