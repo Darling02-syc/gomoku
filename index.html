@@ -1,49 +1,133 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>五子棋</title>
 <style>
-body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#2c2c2c;font-family:Arial}
-#g{text-align:center}
+*{margin:0;padding:0;box-sizing:border-box}
+body{display:flex;justify-content:center;align-items:center;height:100vh;background:#2c2c2c;font-family:Arial;user-select:none}
+#home,#game{text-align:center}
+#home h1{color:#dcb468;font-size:48px;margin-bottom:40px;letter-spacing:8px}
+#home button{display:block;width:240px;margin:12px auto;padding:14px 0;font-size:20px;border:none;border-radius:8px;cursor:pointer;color:#fff;transition:transform .15s}
+#home button:hover{transform:scale(1.05)}
+#home .b1{background:#6b9b6b}#home .b2{background:#6b6b9b}#home .b3{background:#9b6b6b}
 canvas{border:2px solid #8b7355;border-radius:4px;cursor:pointer}
-#s{color:#ccc;margin:12px 0;font-size:18px;min-height:24px}
-#s a{color:#6bc;word-break:break-all}
-#r,#a,#cp,select{color:#fff;border:none;padding:8px 16px;font-size:16px;border-radius:4px;cursor:pointer;margin:8px 4px 0;background:#555}
-#r{background:#6b9b6b}#r:hover{background:#5a8a5a}
-#a{background:#6b6b9b}#a:hover{background:#5a5a8a}
-#cp{background:#9b6b6b;display:none}#cp:hover{background:#8a5a5a}
+#s{color:#ccc;margin:10px 0;font-size:17px;min-height:22px}
+#ctrls{margin-top:4px}
+#ctrls button,select{color:#fff;border:none;padding:8px 16px;font-size:15px;border-radius:4px;cursor:pointer;margin:4px;background:#555}
+#ctrls button:hover{opacity:.85}
+#back{background:#444!important}#reset{background:#6b9b6b}#share{background:#6b6b9b}
+/* Toast */
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 28px;border-radius:8px;font-size:16px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+#toast.show{opacity:1}
+/* Modal overlay */
+#modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);display:none;justify-content:center;align-items:center;z-index:200}
+#modal .box{background:#3a3a3a;padding:28px 32px;border-radius:12px;text-align:center;min-width:300px}
+#modal .box p{color:#ddd;font-size:17px;margin-bottom:20px}
+#modal .box button{padding:8px 28px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:0 8px;color:#fff}
+#modal .ok{background:#6b9b6b}#modal .close{background:#555;position:absolute;top:8px;right:12px;font-size:20px;background:none!important;color:#aaa;cursor:pointer}
 </style></head><body>
-<div id="g"><canvas id="c" width="540" height="540"></canvas>
-<div id="s">⚫ 你的回合</div>
-<button id="r">重新开始</button><button id="a">本地双人</button><button id="cp">📋 复制链接</button>
-<select id="d"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select></div>
+
+<!-- Home -->
+<div id="home">
+  <h1>五 子 棋</h1>
+  <button class="b1" onclick="startGame(1)">🎮 本地对战</button>
+  <button class="b2" onclick="startGame(2)">🌐 线上对战</button>
+  <button class="b3" onclick="startGame(0)">🤖 AI 对战</button>
+</div>
+
+<!-- Game -->
+<div id="game" style="display:none">
+  <canvas id="c" width="540" height="540"></canvas>
+  <div id="s"></div>
+  <div id="ctrls">
+    <button id="back" onclick="goHome()">← 返回</button>
+    <span id="extra"></span>
+    <button id="reset" onclick="doReset()">重新开始</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Modal -->
+<div id="modal">
+  <div class="box" style="position:relative">
+    <span class="close" onclick="closeModal(false)">✕</span>
+    <p>切换难度会重新开始，确定要切换吗？</p>
+    <button class="ok" onclick="closeModal(true)">确定</button>
+    <button class="close" style="position:static;font-size:15px;padding:8px 28px;color:#ccc!important" onclick="closeModal(false)">取消</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/peerjs@0.5.3/dist/peerjs.min.js"></script>
 <script>
-const N=15,S=36,c=document.getElementById('c'),ctx=c.getContext('2d'),sEl=document.getElementById('s'),ds=document.getElementById('d');
-const D4=[[1,0],[0,1],[1,1],[1,-1]];
-let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false;
-let deadline=0,aborted=false,nodes=0,lastX=-1,lastY=-1;
-// mode: 0=AI, 1=Local 2P, 2=Online
-let mode=0,peer=null,conn=null,isHost=false,roomId='',myColor=1;
+const N=15,S=36,D4=[[1,0],[0,1],[1,1],[1,-1]];
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const sEl=document.getElementById('s'),homeEl=document.getElementById('home'),gameEl=document.getElementById('game');
+const extraEl=document.getElementById('extra'),toastEl=document.getElementById('toast'),modalEl=document.getElementById('modal');
 
-// ── Click handler ──
-c.addEventListener('click',e=>{
+let b,turn,over,mode,lastX,lastY;
+let deadline=0,aborted=false,nodes=0;
+// Online
+let peer=null,conn=null,isHost=false,roomId='',myColor=1;
+// AI
+let diff=1,pendingDiff=0;
+
+// ── Init ──
+function newBoard(){b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;}
+
+function startGame(m){
+  mode=m;homeEl.style.display='none';gameEl.style.display='block';
+  newBoard();draw();
+  document.getElementById('reset').style.display='inline-block';
+  if(mode===0)initAI();
+  else if(mode===1)initLocal();
+  else initOnline();
+}
+
+function initAI(){
+  extraEl.innerHTML='<select id="diffsel" onchange="onDiffChange(+this.value)"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select>';
+  document.getElementById('diffsel').value=diff;
+  sEl.textContent='⚫ 你的回合';
+}
+
+function initLocal(){
+  extraEl.innerHTML='';
+  sEl.textContent='⚫ 黑棋回合';
+}
+
+// ── AI difficulty change ──
+function onDiffChange(v){
+  if(hasMoves()){
+    pendingDiff=v;modalEl.style.display='flex';
+  }else{diff=v;}
+}
+function closeModal(ok){
+  modalEl.style.display='none';
+  if(ok){diff=pendingDiff;newBoard();draw();sEl.textContent='⚫ 你的回合';}
+  else{document.getElementById('diffsel').value=diff;}
+}
+function hasMoves(){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])return true;return false;}
+
+// ── Click ──
+canvas.addEventListener('click',e=>{
   if(over)return;
-  if(mode===0&&turn!=1)return;        // AI mode: only player's turn
-  if(mode===2&&turn!==myColor)return; // Online: only your turn
-  if(mode===2&&!conn)return;          // Online: must be connected
+  if(mode===0&&turn!==1)return;
+  if(mode===2&&turn!==myColor)return;
+  if(mode===2&&!conn)return;
   const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
   if(x<0||x>=N||y<0||y>=N||b[y][x])return;
-  place(x,y);
+  doMove(x,y);
   if(!over&&mode===0)aiMove();
   if(!over&&mode===2)sendMove(x,y);
 });
 
-function place(x,y,fromRemote){
+function doMove(x,y){
   b[y][x]=turn;lastX=x;lastY=y;draw();
   if(win(x,y,turn)){
-    let w=turn===1?'⚫':'⚪';
-    if(mode===0)w+=turn===1?' 你':' AI';
-    else if(mode===2)w+=turn===myColor?' 你':' 对手';
-    sEl.textContent=w+' 获胜！';over=true;return;
+    let w=(turn===1?'⚫':'⚪');
+    if(mode===0)w+=turn===1?' 你获胜！':' AI 获胜！';
+    else if(mode===2)w+=turn===myColor?' 你获胜！':' 对手获胜！';
+    else w+=' 获胜！';
+    sEl.textContent=w;over=true;return;
   }
   turn=turn===1?2:1;
   if(mode===0)sEl.textContent=turn===1?'⚫ 你的回合':'⚪ AI 思考中...';
@@ -51,14 +135,9 @@ function place(x,y,fromRemote){
   else sEl.textContent=(turn===myColor?'轮到你了':'等待对手...')+' ('+(turn===1?'⚫':'⚪')+')';
 }
 
-// ── Board utilities ──
+// ── Board utils ──
 function get(x,y){return b[y]&&b[y][x]!=null?b[y][x]:-1}
-function evalBoard(){
-  let t=0;
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
-    t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);
-  return t;
-}
+function evalBoard(){let t=0;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);return t;}
 function lineScore(x,y,p){
   let t=0;
   for(let[dx,dy]of D4){
@@ -66,30 +145,20 @@ function lineScore(x,y,p){
     for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}
     for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}
     let e=o1+o2;
-    if(c>=5)t+=5e7;
-    else if(c===4&&e>=1)t+=2e6;
-    else if(c===4&&e===0)t+=5e4;
-    else if(c===3&&e===2)t+=8e4;
-    else if(c===3&&e===1)t+=8000;
-    else if(c===2&&e===2)t+=3000;
-    else if(c===2&&e===1)t+=500;
-    else if(c===1&&e===2)t+=200;
+    if(c>=5)t+=5e7;else if(c===4&&e>=1)t+=2e6;else if(c===4&&e===0)t+=5e4;
+    else if(c===3&&e===2)t+=8e4;else if(c===3&&e===1)t+=8000;
+    else if(c===2&&e===2)t+=3000;else if(c===2&&e===1)t+=500;else if(c===1&&e===2)t+=200;
   }
   return t;
 }
-function hasWin(p){
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;if(w)return[x,y];}
-  return null;
-}
+function hasWin(p){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;if(w)return[x,y];}return null;}
 function hasFour(p){
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){
-    for(let[dx,dy]of D4){
-      let c=0,o1=0,o2=0;b[y][x]=p;
-      for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}
-      for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}
-      b[y][x]=0;
-      if(c>=4&&(o1+o2)>=1)return[x,y];
-    }
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x])for(let[dx,dy]of D4){
+    let c=0,o1=0,o2=0;b[y][x]=p;
+    for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}
+    for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}
+    b[y][x]=0;
+    if(c>=4&&(o1+o2)>=1)return[x,y];
   }
   return null;
 }
@@ -99,44 +168,33 @@ function quickScore(x,y,p){
     let c=0,e=0;
     for(let i=1;i<=4;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)e++;break}}
     for(let i=1;i<=4;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)e++;break}}
-    if(c>=3&&e>=1)s+=5e4;
-    else if(c===2&&e>=1)s+=2000;
-    else if(c===1&&e>=1)s+=200;
+    if(c>=3&&e>=1)s+=5e4;else if(c===2&&e>=1)s+=2000;else if(c===1&&e>=1)s+=200;
     s+=c*10;
   }
   return s+(14-Math.abs(x-7)-Math.abs(y-7))*5;
 }
 function getMoves(rng){
   let set=new Set(),m=[];
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
-    for(let dy=-rng;dy<=rng;dy++)for(let dx=-rng;dx<=rng;dx++){
-      let ny=y+dy,nx=x+dx;
-      if(nx>=0&&nx<N&&ny>=0&&ny<N&&!b[ny][nx])set.add(ny*N+nx);
-    }
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])for(let dy=-rng;dy<=rng;dy++)for(let dx=-rng;dx<=rng;dx++){let ny=y+dy,nx=x+dx;if(nx>=0&&nx<N&&ny>=0&&ny<N&&!b[ny][nx])set.add(ny*N+nx);}
   if(!set.size){let c=7;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)set.add((c+dy)*N+(c+dx));}
   for(let k of set)m.push([k%N,Math.floor(k/N)]);
   return m;
 }
 
-// ── Minimax search ──
+// ── Minimax ──
 function search(d,alpha,beta,mx){
-  nodes++;
-  if(nodes%512===0&&Date.now()>deadline){aborted=true;return evalBoard();}
+  nodes++;if(nodes%512===0&&Date.now()>deadline){aborted=true;return evalBoard();}
   if(d<=0)return evalBoard();
   let p=mx?2:1,moves=getMoves(1);
   let scored=moves.map(([x,y])=>({x,y,s:quickScore(x,y,p)+quickScore(x,y,mx?1:2)*0.9}));
   scored.sort((a,b)=>b.s-a.s);
-  let bestV=mx?-Infinity:Infinity,any=false;
-  let limit=Math.min(scored.length,16);
+  let bestV=mx?-Infinity:Infinity,any=false,limit=Math.min(scored.length,16);
   for(let i=0;i<limit;i++){
     let{x,y}=scored[i];
-    b[y][x]=p;if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1e3:(-1e8-d*1e3);}
-    b[y][x]=0;
+    b[y][x]=p;if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1e3:(-1e8-d*1e3);}b[y][x]=0;
     b[y][x]=p;let sc=search(d-1,alpha,beta,!mx);b[y][x]=0;any=true;
-    if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}
-    else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}
-    if(alpha>=beta)break;
-    if(aborted){if(any)return bestV;break;}
+    if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}
+    if(alpha>=beta)break;if(aborted){if(any)return bestV;break;}
   }
   if(!any)return evalBoard();
   return bestV;
@@ -144,111 +202,84 @@ function search(d,alpha,beta,mx){
 
 // ── AI ──
 function aiMove(){
-  setTimeout(()=>{
-    if(mode!==0||over)return;
-    let lv=+ds.value,bx=7,by=7;
-    let w=hasWin(2);if(w){place(w[0],w[1]);return;}
-    w=hasWin(1);if(w){place(w[0],w[1]);return;}
-    let f=hasFour(1);if(f){place(f[0],f[1]);return;}
+  setTimeout(()=>{if(mode!==0||over)return;
+    let bx=7,by=7;
+    let w=hasWin(2);if(w){doMove(w[0],w[1]);return;}
+    w=hasWin(1);if(w){doMove(w[0],w[1]);return;}
+    let f=hasFour(1);if(f){doMove(f[0],f[1]);return;}
     let moves=getMoves(2);
     let scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
-    if(lv===0){
-      scored.sort((a,b)=>b.s-a.s);
-      let pool=scored.slice(0,Math.max(8,scored.length>>2));
-      let pick=pool[Math.floor(Math.random()*pool.length)];
-      bx=pick.x;by=pick.y;
-    }else if(lv===1){
-      let best=-Infinity;
-      for(let{x,y,s:v}of scored)if(v>best){best=v;bx=x;by=y;}
+    if(diff===0){
+      scored.sort((a,b)=>b.s-a.s);let pool=scored.slice(0,Math.max(8,scored.length>>2));
+      let pick=pool[Math.floor(Math.random()*pool.length)];bx=pick.x;by=pick.y;
+    }else if(diff===1){
+      let best=-Infinity;for(let{x,y,s:v}of scored)if(v>best){best=v;bx=x;by=y;}
     }else{
-      let maxDepth=lv===2?8:16,topN=lv===2?45:35;
-      let timeLimit=lv===2?2000:5000,startDepth=lv===2?2:4;
-      scored.sort((a,b)=>b.s-a.s);
-      let cands=scored.slice(0,topN),best=-Infinity;
+      let maxDepth=diff===2?8:16,topN=diff===2?45:35,timeLimit=diff===2?2000:5000,startDepth=diff===2?2:4;
+      scored.sort((a,b)=>b.s-a.s);let cands=scored.slice(0,topN),best=-Infinity;
       deadline=Date.now()+timeLimit;aborted=false;nodes=0;
       for(let d=startDepth;d<=maxDepth&&!aborted;d+=2){
         let roundBest=-Infinity,rbx=bx,rby=by;
         let n=d<=4?cands.length:Math.min(cands.length,20+Math.floor((maxDepth-d)*2));
-        for(let i=0;i<n;i++){
-          if(Date.now()>deadline){aborted=true;break;}
-          let{x,y}=cands[i];b[y][x]=2;
-          let sc=search(d-1,-Infinity,Infinity,false);b[y][x]=0;
-          if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}
-        }
+        for(let i=0;i<n;i++){if(Date.now()>deadline){aborted=true;break;}let{x,y}=cands[i];b[y][x]=2;let sc=search(d-1,-Infinity,Infinity,false);b[y][x]=0;if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}}
         if(!aborted){best=roundBest;bx=rbx;by=rby;}
-        if(!aborted&&d<maxDepth)for(let i=0;i<Math.min(8,cands.length);i++){
-          b[cands[i].y][cands[i].x]=2;
-          cands[i].s=search(Math.min(2,d-1),-Infinity,Infinity,false);
-          b[cands[i].y][cands[i].x]=0;
-        }
+        if(!aborted&&d<maxDepth)for(let i=0;i<Math.min(8,cands.length);i++){b[cands[i].y][cands[i].x]=2;cands[i].s=search(Math.min(2,d-1),-Infinity,Infinity,false);b[cands[i].y][cands[i].x]=0;}
         if(!aborted)cands.sort((a,b)=>b.s-a.s);
       }
     }
-    if(!over)place(bx,by);
+    if(!over)doMove(bx,by);
   },50);
 }
 
 // ── Online ──
 function initOnline(){
-  let params=new URLSearchParams(window.location.search);
-  let rid=params.get('room');
+  let params=new URLSearchParams(window.location.search),rid=params.get('room');
   if(rid){joinRoom(rid);}else{createRoom();}
 }
-
 function createRoom(){
   isHost=true;myColor=1;roomId=Math.random().toString(36).substring(2,8).toUpperCase();
+  extraEl.innerHTML='房间: <b>'+roomId+'</b> <button id="share" onclick="shareRoom()">📋 分享房间</button>';
   peer=new Peer(roomId,{host:'0.peerjs.com',port:443,secure:true,debug:0});
-  peer.on('open',()=>{
-    let link=location.origin+location.pathname+'?room='+roomId;
-    sEl.innerHTML='等待对手加入...<br><small>房间码: <b>'+roomId+'</b></small>';
-    document.getElementById('cp').style.display='inline-block';
-    document.getElementById('cp').onclick=()=>{navigator.clipboard.writeText(link).then(()=>{sEl.textContent='链接已复制！发送给好友即可';setTimeout(()=>{sEl.innerHTML='等待对手加入...<br><small>房间码: <b>'+roomId+'</b></small>';},1500);});};
-  });
+  peer.on('open',()=>{sEl.textContent='等待对手加入...';});
   peer.on('connection',c=>{conn=c;setupConn();});
   peer.on('error',()=>{sEl.textContent='连接失败，请重试';});
 }
-
 function joinRoom(rid){
   isHost=false;myColor=2;roomId=rid;
+  extraEl.innerHTML='房间: <b>'+rid+'</b>';
   peer=new Peer({host:'0.peerjs.com',port:443,secure:true,debug:0});
-  peer.on('open',()=>{
-    sEl.textContent='正在加入房间 '+rid+'...';
-    conn=peer.connect(rid,{reliable:true});
-    setupConn();
-  });
-  peer.on('error',()=>{sEl.textContent='加入失败，请检查房间码是否正确';});
+  peer.on('open',()=>{sEl.textContent='正在加入...';conn=peer.connect(rid,{reliable:true});setupConn();});
+  peer.on('error',()=>{sEl.textContent='加入失败，请检查房间码';});
 }
-
+function shareRoom(){
+  let link=location.origin+location.pathname+'?room='+roomId;
+  navigator.clipboard.writeText(link).then(()=>{showToast('房间码已复制，分享给好友吧！');});
+}
 function setupConn(){
-  function onOpen(){
-    if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}
-    else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}
-  }
+  function onOpen(){if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}}
   if(conn.open){onOpen();}else{conn.on('open',onOpen);}
-  conn.on('data',data=>{
-    if(data.t==='move'&&!over){
-      // Apply opponent's move
-      let op=isHost?2:1;
-      b[data.y][data.x]=op;lastX=data.x;lastY=data.y;turn=myColor;draw();
-      if(win(data.x,data.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}
-      sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';
-    }
-  });
+  conn.on('data',data=>{if(data.t==='move'&&!over){let op=isHost?2:1;b[data.y][data.x]=op;lastX=data.x;lastY=data.y;turn=myColor;draw();if(win(data.x,data.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}});
   conn.on('close',()=>{sEl.textContent='连接已断开';conn=null;});
 }
+function sendMove(x,y){if(conn)conn.send({t:'move',x,y});}
+function cleanupOnline(){if(conn){conn.close();conn=null;}if(peer){peer.destroy();peer=null;}isHost=false;roomId='';}
 
-function sendMove(x,y){
-  if(conn)conn.send({t:'move',x:x,y:y});
+// ── Toast ──
+function showToast(msg){toastEl.textContent=msg;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),2000);}
+
+// ── Navigation ──
+function goHome(){
+  if(mode===2)cleanupOnline();
+  homeEl.style.display='block';gameEl.style.display='none';
+  extraEl.innerHTML='';
+}
+function doReset(){
+  newBoard();
+  if(mode===2){cleanupOnline();initOnline();}else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}
+  draw();
 }
 
-function cleanupOnline(){
-  if(conn){conn.close();conn=null;}
-  if(peer){peer.destroy();peer=null;}
-  isHost=false;roomId='';
-  document.getElementById('cp').style.display='none';
-}
-
-// ── Draw ──
+// ── Draw & win ──
 function draw(){
   ctx.fillStyle='#dcb468';ctx.fillRect(0,0,540,540);
   ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
@@ -257,37 +288,15 @@ function draw(){
     let cx=x*S+S/2,cy=y*S+S/2;
     ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);
     ctx.fillStyle=b[y][x]===1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
-    if(x===lastX&&y===lastY){
-      ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);
-      ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;
-    }
+    if(x===lastX&&y===lastY){ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;}
   }
 }
 function win(x,y,p){
   for(let[dx,dy]of D4){let c=1;for(let i=1;i<5;i++)if(b[y+dy*i]&&b[y+dy*i][x+dx*i]===p)c++;else break;for(let i=1;i<5;i++)if(b[y-dy*i]&&b[y-dy*i][x-dx*i]===p)c++;else break;if(c>=5)return true;}
   return false;
 }
-function reset(){
-  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;
-}
 
-// ── Buttons ──
-document.getElementById('r').addEventListener('click',()=>{
-  reset();
-  if(mode===0)sEl.textContent='⚫ 你的回合';
-  else if(mode===1)sEl.textContent='⚫ 黑棋回合';
-  else{cleanupOnline();initOnline();}
-  draw();
-});
-const ab=document.getElementById('a');
-ab.addEventListener('click',()=>{
-  if(mode===2)cleanupOnline();
-  mode=(mode+1)%3;
-  reset();
-  if(mode===0){ab.textContent='本地双人';ds.style.display='';sEl.textContent='⚫ 你的回合';}
-  else if(mode===1){ab.textContent='线上对战';ds.style.display='';sEl.textContent='⚫ 黑棋回合';}
-  else{ab.textContent='AI 对战';ds.style.display='none';initOnline();}
-  draw();
-});
-draw();
+newBoard();draw();
+// Auto-join if URL has room code
+if(new URLSearchParams(window.location.search).get('room'))startGame(2);
 </script></body></html>
