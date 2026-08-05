@@ -2,268 +2,172 @@
 <html><head><meta charset="UTF-8"><title>五子棋</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{display:flex;justify-content:center;align-items:center;height:100vh;background:linear-gradient(135deg,#1a1a2e,#16213e,#1a1a2e);font-family:'Segoe UI',Arial,sans-serif;user-select:none;overflow:hidden}
-body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.4) 100%);pointer-events:none}
-#home,#game{text-align:center;position:relative;z-index:1}
-#home h1{color:#dcb468;font-size:56px;margin-bottom:16px;letter-spacing:12px;text-shadow:0 0 40px rgba(220,180,104,.3);animation:fadeIn .8s}
-#home .sub{color:#888;margin-bottom:36px;font-size:15px;letter-spacing:4px;animation:fadeIn 1s}
-#home button{display:block;width:260px;margin:14px auto;padding:16px 0;font-size:20px;border:1px solid rgba(255,255,255,.08);border-radius:12px;cursor:pointer;color:#fff;transition:all .25s;backdrop-filter:blur(10px);position:relative;overflow:hidden;animation:slideUp .6s}
-#home button:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.4)}
-#home button:active{transform:scale(.97)}
-#home .b1{background:rgba(107,155,107,.25);animation-delay:.1s}
-#home .b2{background:rgba(107,107,155,.25);animation-delay:.2s}
-#home .b3{background:rgba(155,107,107,.25);animation-delay:.3s}
-#game{display:none;background:rgba(0,0,0,.2);border-radius:16px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-canvas{border-radius:6px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.4),inset 0 0 60px rgba(0,0,0,.1)}
-#s{color:#ddd;margin:10px 0;font-size:18px;min-height:24px;transition:color .4s}
-#s.win{color:#f0c040;font-size:22px;animation:bounce .5s}
-#ctrls{margin-top:6px;display:flex;justify-content:center;align-items:center;gap:2px;flex-wrap:wrap}
-#ctrls button,select{color:#fff;border:1px solid rgba(255,255,255,.1);padding:9px 18px;font-size:14px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,.08);transition:all .2s}
-#ctrls button:hover{background:rgba(255,255,255,.16);transform:translateY(-1px)}
-#back{background:rgba(255,255,255,.05)!important}#reset{background:rgba(107,155,107,.25)!important}#share{background:rgba(107,107,155,.25)!important}
-#toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:14px 32px;border-radius:12px;font-size:16px;opacity:0;transition:all .35s;pointer-events:none;z-index:100;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1)}
-#toast.show{opacity:1;top:32px}
-#modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:200;backdrop-filter:blur(4px)}
-#modal .box{background:linear-gradient(135deg,#333,#2a2a2a);padding:32px 40px;border-radius:16px;text-align:center;min-width:320px;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.06);position:relative}
-#modal .box p{color:#ddd;font-size:17px;margin-bottom:24px}
-#modal .box button{padding:10px 32px;font-size:16px;border:none;border-radius:8px;cursor:pointer;margin:0 8px;color:#fff;transition:all .2s}
-#modal .ok{background:#6b9b6b}#modal .ok:hover{background:#7aab7a}
-#modal .close{background:#555;position:absolute;top:12px;right:16px;font-size:20px;background:none!important;color:#999;cursor:pointer}
+body{display:flex;justify-content:center;align-items:center;height:100vh;background:#1a1a2e;font-family:Segoe UI,Arial,sans-serif;user-select:none}
+#home,#game{text-align:center}
+#home h1{color:#dcb468;font-size:52px;margin-bottom:30px;letter-spacing:8px;text-shadow:0 0 30px rgba(220,180,104,.3);animation:fadeIn .8s}
+#home button{display:block;width:240px;margin:12px auto;padding:14px;font-size:19px;border:none;border-radius:10px;cursor:pointer;color:#fff;transition:all .2s;animation:slideUp .5s}
+#home button:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#home .b1{background:#5a8a5a;animation-delay:.05s}#home .b2{background:#5a5a8a;animation-delay:.15s}#home .b3{background:#8a5a5a;animation-delay:.25s}
+#game{display:none}
+canvas{border-radius:6px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#s{color:#ccc;margin:8px 0;font-size:17px;min-height:22px;transition:color .3s}
+#s.win{color:#f0c040;font-size:21px;animation:bounce .5s}
+#ctrls{margin-top:4px}
+#ctrls button,select{color:#fff;border:none;padding:8px 16px;font-size:14px;border-radius:6px;cursor:pointer;margin:3px;background:#444;transition:all .15s}
+#ctrls button:hover{opacity:.85}
+#reset{background:#5a8a5a}#share{background:#5a5a8a}
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:12px 28px;border-radius:10px;font-size:15px;opacity:0;transition:all .3s;pointer-events:none;z-index:100}
+#toast.show{opacity:1;top:28px}
+#modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.65);display:none;justify-content:center;align-items:center;z-index:200}
+#modal .box{background:#333;padding:28px 36px;border-radius:14px;text-align:center;min-width:300px;position:relative}
+#modal .box p{color:#ddd;font-size:16px;margin-bottom:20px}
+#modal .box button{padding:8px 28px;font-size:15px;border:none;border-radius:6px;cursor:pointer;margin:0 6px;color:#fff}
+#modal .ok{background:#5a8a5a}#modal .close{background:#555;position:absolute;top:8px;right:12px;font-size:18px;background:none!important;color:#999;cursor:pointer}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 </style></head><body>
-<div id="home">
-  <h1>五 子 棋</h1>
-  <div class="sub">GOMOKU</div>
-  <button class="b1" onclick="startGame(1)">🎮 本地对战</button>
-  <button class="b2" onclick="startGame(2)">🌐 线上对战</button>
-  <button class="b3" onclick="startGame(0)">🤖 AI 对战</button>
-</div>
-<div id="game">
-  <canvas id="c" width="540" height="540"></canvas>
-  <div id="s"></div>
-  <div id="ctrls">
-    <button id="back" onclick="goHome()">← 返回</button>
-    <span id="extra"></span>
-    <button id="reset" onclick="doReset()">重新开始</button>
-  </div>
-</div>
+<div id="home"><h1>五 子 棋</h1>
+<button class="b1" onclick="start(1)">🎮 本地对战</button>
+<button class="b2" onclick="start(2)">🌐 线上对战</button>
+<button class="b3" onclick="start(0)">🤖 AI 对战</button></div>
+<div id="game"><canvas id="c" width="540" height="540"></canvas>
+<div id="s"></div><div id="ctrls">
+<button id="back" onclick="goHome()">← 返回</button>
+<span id="extra"></span>
+<button id="reset" onclick="reset()">重新开始</button></div></div>
 <div id="toast"></div>
-<div id="modal">
-  <div class="box">
-    <span class="close" onclick="closeModal(false)">✕</span>
-    <p>切换难度会重新开始，确定要切换吗？</p>
-    <button class="ok" onclick="closeModal(true)">确定</button>
-    <button class="close" style="position:static;font-size:15px;padding:10px 32px;color:#ccc!important" onclick="closeModal(false)">取消</button>
-  </div>
-</div>
+<div id="modal"><div class="box"><span class="close" onclick="closeModal(0)">✕</span>
+<p>切换难度会重新开始，确定要切换吗？</p>
+<button class="ok" onclick="closeModal(1)">确定</button>
+<button style="position:static;font-size:15px;padding:8px 28px;color:#ccc!important" onclick="closeModal(0)">取消</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
 <script>
-const N=15,S=36,D4=[[1,0],[0,1],[1,1],[1,-1]];
-const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-const sEl=document.getElementById('s'),homeEl=document.getElementById('home'),gameEl=document.getElementById('game');
-const extraEl=document.getElementById('extra'),toastEl=document.getElementById('toast'),modalEl=document.getElementById('modal');
-let b,turn,over,mode,lastX,lastY,stoneAnim=0,lastAnim=0,particles=[];
-let deadline=0,aborted=false,nodes=0;
-let client=null,isHost=false,roomId='',myColor=1,onlineReady=false;
-let diff=1,pendingDiff=0;
+const N=15,S=36,D=[[1,0],[0,1],[1,1],[1,-1]];
+const C=document.getElementById('c'),ctx=C.getContext('2d'),E=id=>document.getElementById(id);
+const sEl=E('s'),xEl=E('extra'),tEl=E('toast'),mEl=E('modal');
+let B,turn,over,md,lx=-1,ly=-1,deadline=0,aborted=0,nodes=0,ac=null;
+let cl=null,host=0,rid='',mc=1,rdy=0,df=1,pdf=0;
 
-// ═══════════ Audio Engine ═══════════
-let audioCtx=null;
-function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
-function playClick(){
-  if(!audioCtx)return;
-  let t=audioCtx.currentTime,g=audioCtx.createGain(),o=audioCtx.createOscillator(),f=audioCtx.createBiquadFilter();
-  g.gain.setValueAtTime(.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);
-  o.type='triangle';o.frequency.setValueAtTime(800,t);o.frequency.exponentialRampToValueAtTime(200,t+.06);
-  f.type='bandpass';f.frequency.value=1200;f.Q.value=.8;
-  o.connect(f);f.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.08);
+// ── Audio ──
+function au(){ac||(ac=new(window.AudioContext||window.webkitAudioContext)())}
+function sfx(fq,dr,ty='triangle',vol=.25,dl=0){
+  if(!ac)return;let t=ac.currentTime+dl,o=ac.createOscillator(),g=ac.createGain();
+  o.type=ty;o.frequency.value=fq;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dr);
+  o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+dr);
 }
-function playWin(){
-  if(!audioCtx)return;
-  let t=audioCtx.currentTime,notes=[523,659,784,1047],dur=.18;
-  notes.forEach((freq,i)=>{
-    let o=audioCtx.createOscillator(),g=audioCtx.createGain();
-    o.type='triangle';o.frequency.value=freq;
-    g.gain.setValueAtTime(.25,t+i*dur);g.gain.exponentialRampToValueAtTime(.001,t+i*dur+dur*.8);
-    o.connect(g);g.connect(audioCtx.destination);o.start(t+i*dur);o.stop(t+i*dur+dur);
-  });
-}
+function clickSnd(){sfx(800,.06,'triangle',.3);sfx(400,.04,'sine',.15)}
+function winSnd(){[523,659,784,1047].forEach((f,i)=>sfx(f,.25,'triangle',.2,i*.16))}
 
-// ═══════════ Particle system ═══════════
-function spawnParticles(){
-  for(let i=0;i<40;i++)particles.push({x:270,y:270,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6-2,life:1,decay:.008+Math.random()*.02,size:2+Math.random()*4,color:['#f0c040','#e74c3c','#fff','#6bc'][i%4]});
-  if(particles.length)requestAnimationFrame(animParticles);
+// ── Board ──
+function nb(){B=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=0;lx=ly=-1}
+function G(x,y){return B[y]&&B[y][x]!=null?B[y][x]:-1}
+function rng(r=1){let s=new Set(),m=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(B[y][x])
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){let ny=y+dy,nx=x+dx;if(nx>=0&&nx<N&&ny>=0&&ny<N&&!B[ny][nx])s.add(ny*N+nx);}
+  if(!s.size){let c=7;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)s.add((c+dy)*N+(c+dx));}
+  for(let k of s)m.push([k%N,~~(k/N)]);return m;
 }
-let particleRAF=null;
-function animParticles(){
-  ctx.fillStyle='#dcb468';ctx.fillRect(0,0,540,540);
-  ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
+function sc(x,y,p){
+  let v=0;
+  for(let[dx,dy]of D){let c=0,o1=0,o2=0;
+    for(let i=1;i<=5;i++){let v=G(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}
+    for(let i=1;i<=5;i++){let v=G(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}
+    let e=o1+o2;if(c>=5)v+=5e7;else if(c==4&&e)v+=2e6;else if(c==4)v+=5e4
+    else if(c==3&&e==2)v+=8e4;else if(c==3&&e==1)v+=8e3;else if(c==2&&e==2)v+=3e3;else if(c==2&&e==1)v+=500;else if(c==1&&e==2)v+=200;
+  }return v;
+}
+function qs(x,y,p){let s=0;for(let[dx,dy]of D){let c=0,e=0;
+  for(let i=1;i<=4;i++){let v=G(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)e++;break}}
+  for(let i=1;i<=4;i++){let v=G(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)e++;break}}
+  if(c>=3&&e)s+=5e4;else if(c==2&&e)s+=2e3;else if(c==1&&e)s+=200;s+=c*10;
+}return s+(14-Math.abs(x-7)-Math.abs(y-7))*5;}
+function hw(p){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!B[y][x]){B[y][x]=p;if(win(x,y,p)){B[y][x]=0;return[x,y];}B[y][x]=0;}return 0;}
+function eb(){let t=0;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(B[y][x])t+=B[y][x]==2?sc(x,y,2):-sc(x,y,1);return t;}
+
+// ── Draw ──
+function dr(){
+  ctx.fillStyle='#dcb468';ctx.fillRect(0,0,540,540);ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
   for(let i=0;i<N;i++){ctx.beginPath();ctx.moveTo(S/2,i*S+S/2);ctx.lineTo(540-S/2,i*S+S/2);ctx.stroke();ctx.beginPath();ctx.moveTo(i*S+S/2,S/2);ctx.lineTo(i*S+S/2,540-S/2);ctx.stroke();}
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x]){let cx=x*S+S/2,cy=y*S+S/2;ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);ctx.fillStyle=b[y][x]==1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();if(x===lastX&&y===lastY){ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;}}
-  let alive=false;
-  for(let p of particles){if(p.life<=0)continue;alive=true;p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.life-=p.decay;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=p.color.replace(')','');ctx.globalAlpha=p.life;ctx.fill();}
-  ctx.globalAlpha=1;
-  particles=particles.filter(p=>p.life>0);
-  if(particles.length)particleRAF=requestAnimationFrame(animParticles);
-}
-
-// ═══════════ Stone pop-in animation ═══════════
-function animStone(){
-  if(stoneAnim>=1){stoneAnim=0;return;}
-  stoneAnim=Math.min(1,stoneAnim+.12);
-  let cx=lastX*S+S/2,cy=lastY*S+S/2,r=Math.max(1,S/2-2),sr=r*stoneAnim,alpha=.3+stoneAnim*.7;
-  draw();
-  // Overdraw the last stone with animation scale
-  if(lastX>=0&&lastY>=0){
-    let p=b[lastY][lastX];
-    ctx.beginPath();ctx.arc(cx,cy,sr,0,Math.PI*2);
-    ctx.fillStyle=p===1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
-    // Highlight ring
-    ctx.beginPath();ctx.arc(cx,cy,sr+1,0,Math.PI*2);
-    ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.globalAlpha=alpha;ctx.stroke();ctx.lineWidth=1;ctx.globalAlpha=1;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(B[y][x]){
+    let cx=x*S+S/2,cy=y*S+S/2;ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);
+    ctx.fillStyle=B[y][x]==1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
+    if(x==lx&&y==ly){ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;}
   }
-  if(stoneAnim<1)requestAnimationFrame(animStone);else{stoneAnim=0;draw();}
 }
+function win(x,y,p){for(let[dx,dy]of D){let c=1;for(let i=1;i<5;i++)if(B[y+dy*i]&&B[y+dy*i][x+dx*i]==p)c++;else break;for(let i=1;i<5;i++)if(B[y-dy*i]&&B[y-dy*i][x-dx*i]==p)c++;else break;if(c>=5)return 1;}return 0;}
 
-// ═══════════ Pulse last move ═══════════
-let pulseT=0,pulseRAF=null;
-function startPulse(){pulseT=0;if(!pulseRAF)pulseRAF=requestAnimationFrame(animPulse);}
-function animPulse(ts){
-  pulseT+=.04;if(pulseT>Math.PI*2){pulseT=0;pulseRAF=null;draw();return;}
-  draw();
-  if(lastX>=0&&lastY>=0){
-    let cx=lastX*S+S/2,cy=lastY*S+S/2,r=S/2-1+Math.sin(pulseT)*3;
-    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.strokeStyle='#e74c3c';ctx.lineWidth=2+Math.abs(Math.sin(pulseT))*2;ctx.stroke();ctx.lineWidth=1;
+// ── Move ──
+function mv(x,y){
+  B[y][x]=turn;lx=x;ly=y;dr();clickSnd();
+  if(win(x,y,turn)){
+    let w=(turn==1?'⚫':'⚪');w+=(md==0?(turn==1?' 你获胜！':' AI 获胜！'):md==2?(turn==mc?' 你获胜！':' 对手获胜！'):' 获胜！');
+    sEl.textContent=w;sEl.className='win';over=1;winSnd();return;
   }
-  pulseRAF=requestAnimationFrame(animPulse);
+  turn=turn==1?2:1;
+  if(md==0)sEl.textContent=turn==1?'⚫ 你的回合':'⚪ AI 思考中...';
+  else if(md==1)sEl.textContent=(turn==1?'⚫ 黑棋':'⚪ 白棋')+' 回合';
+  else sEl.textContent=(turn==mc?'轮到你了':'等待对手...')+' ('+(turn==1?'⚫':'⚪')+')';
 }
 
-// ═══════════ Init ═══════════
-function newBoard(){b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;stoneAnim=0;particles=[];if(particleRAF){cancelAnimationFrame(particleRAF);particleRAF=null;}if(pulseRAF){cancelAnimationFrame(pulseRAF);pulseRAF=null;}}
-
-function startGame(m){
-  initAudio();
-  mode=m;homeEl.style.display='none';gameEl.style.display='block';
-  newBoard();draw();
-  document.getElementById('reset').style.display='inline-block';
-  sEl.className='';
-  if(mode===0)initAI();else if(mode===1)initLocal();else initOnline();
+// ── Search ──
+function srch(d,a,b2,mx){
+  nodes++;if(nodes%384==0&&Date.now()>deadline){aborted=1;return eb();}
+  if(d<=0)return eb();
+  let p=mx?2:1,mv=rng(),sd=mv.map(([x,y])=>({x,y,s:qs(x,y,p)+qs(x,y,mx?1:2)*.9}));sd.sort((a,b)=>b.s-a.s);
+  let bv=mx?-1/0:1/0,any=0,lm=Math.min(sd.length,14);
+  for(let i=0;i<lm;i++){let{x,y}=sd[i];B[y][x]=p;if(win(x,y,p)){B[y][x]=0;return mx?1e8+d*1e3:-1e8-d*1e3;}B[y][x]=0;
+    B[y][x]=p;let s=srch(d-1,a,b2,!mx);B[y][x]=0;any=1;
+    if(mx){if(s>bv)bv=s;if(bv>a)a=bv;}else{if(s<bv)bv=s;if(bv<b2)b2=bv;}if(a>=b2)break;if(aborted){if(any)return bv;break;}}
+  if(!any)return eb();return bv;
 }
 
-function initAI(){
-  extraEl.innerHTML='<select id="diffsel" onchange="onDiffChange(+this.value)"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select>';
-  document.getElementById('diffsel').value=diff;
-  sEl.textContent='⚫ 你的回合';
+// ── AI ──
+function ai(){
+  setTimeout(()=>{if(md!=0||over)return;let bx=7,by=7,w=hw(2);if(w){mv(w[0],w[1]);return;}w=hw(1);if(w){mv(w[0],w[1]);return;}
+    let ms=rng(2),sd=ms.map(([x,y])=>({x,y,s:sc(x,y,2)+sc(x,y,1)*.9}));
+    if(df==0){sd.sort((a,b)=>b.s-a.s);let p=sd.slice(0,Math.max(8,sd.length>>2));let pk=p[~~(Math.random()*p.length)];bx=pk.x;by=pk.y;}
+    else if(df==1){let be=-1/0;for(let{x,y,s:v}of sd)if(v>be){be=v;bx=x;by=y;}}
+    else{let mD=df==2?8:16,tN=df==2?45:35,tL=df==2?2000:5000,sD=df==2?2:4;sd.sort((a,b)=>b.s-a.s);let cs=sd.slice(0,tN),be=-1/0;deadline=Date.now()+tL;aborted=0;nodes=0;
+      for(let d=sD;d<=mD&&!aborted;d+=2){let rb=-1/0,rx=bx,ry=by,n=d<=4?cs.length:Math.min(cs.length,20+~~((mD-d)*2));
+        for(let i=0;i<n;i++){if(Date.now()>deadline){aborted=1;break;}let{x,y}=cs[i];B[y][x]=2;let sc=srch(d-1,-1/0,1/0,0);B[y][x]=0;if(!aborted&&sc>rb){rb=sc;rx=x;ry=y;}}
+        if(!aborted){be=rb;bx=rx;by=ry;}if(!aborted&&d<mD)cs.sort((a,b)=>b.s-a.s);}}
+    if(!over)mv(bx,by);},50);
 }
-function initLocal(){extraEl.innerHTML='';sEl.textContent='⚫ 黑棋回合';}
 
-// ═══════════ AI difficulty ═══════════
-function onDiffChange(v){if(hasMoves()){pendingDiff=v;modalEl.style.display='flex';}else{diff=v;}}
-function closeModal(ok){modalEl.style.display='none';if(ok){diff=pendingDiff;newBoard();draw();sEl.textContent='⚫ 你的回合';}else{document.getElementById('diffsel').value=diff;}}
-function hasMoves(){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])return true;return false;}
+// ── Online ──
+function io(){
+  let p=new URLSearchParams(location.search),r=p.get('room');host=!r;mc=host?1:2;rid=r||Math.random().toString(36).substring(2,8).toUpperCase();
+  xEl.innerHTML='房间: <b>'+rid+'</b>'+(host?' <button id="share" onclick="sh()">📋 分享房间</button>':'');
+  cl=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clientId:'gmk_'+Math.random().toString(36).substring(2,8)});let tp='gmk/'+rid;
+  cl.on('connect',()=>{cl.subscribe(tp);sEl.textContent=host?'等待对手加入... (你执 ⚫)':'已加入！等待 ⚫ 黑棋落子';turn=1;rdy=0;});
+  cl.on('message',(t,m)=>{let d;try{d=JSON.parse(m.toString());}catch(e){return;}if(d.s==mc)return;
+    if(d.t=='join'&&host){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;rdy=1;cl.publish(tp,JSON.stringify({t:'ack',s:mc}));}
+    if(d.t=='ack'&&!host){sEl.textContent='已连接！等待 ⚫ 黑棋落子';rdy=1;}
+    if(d.t=='reset'){nb();dr();sEl.className='';sEl.textContent=host?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;rdy=1;}
+    if(d.t=='move'&&!over){let op=host?2:1;B[d.y][d.x]=op;lx=d.x;ly=d.y;turn=mc;clickSnd();dr();if(win(d.x,d.y,op)){sEl.textContent=(op==1?'⚫':'⚪')+' 对手获胜！';sEl.className='win';over=1;rdy=0;winSnd();return;}sEl.textContent='轮到你了 ('+(mc==1?'⚫':'⚪')+')';}});
+  cl.on('error',()=>{sEl.textContent='连接失败，请重试';rdy=0;});
+  if(!host)setTimeout(()=>{cl.publish(tp,JSON.stringify({t:'join',s:mc}));},800);
+}
+function sh(){let b=location.href.split('?')[0];if(b.startsWith('file://'))b='https://darling02-syc.github.io/gomoku/';navigator.clipboard.writeText(b+'?room='+rid).then(()=>{tEl.textContent='房间码已复制，分享给好友吧！';tEl.classList.add('show');setTimeout(()=>tEl.classList.remove('show'),2000);});}
+function sm(x,y){if(cl)cl.publish('gmk/'+rid,JSON.stringify({t:'move',x,y,s:mc}));}
+function clr(){if(cl){cl.end();cl=null;}host=0;rid='';rdy=0;}
 
-// ═══════════ Click ═══════════
-canvas.addEventListener('click',e=>{
-  if(over)return;
-  if(mode===0&&turn!==1)return;
-  if(mode===2&&turn!==myColor)return;
-  if(mode===2&&!onlineReady)return;
-  const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
-  if(x<0||x>=N||y<0||y>=N||b[y][x])return;
-  doMove(x,y);
-  if(!over&&mode===0)aiMove();
-  if(!over&&mode===2)sendMove(x,y);
+// ── UI ──
+function start(m){au();md=m;E('home').style.display='none';E('game').style.display='block';nb();dr();sEl.className='';
+  if(md==0)xEl.innerHTML='<select id="ds" onchange="odf(+this.value)"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select>',E('ds').value=df,sEl.textContent='⚫ 你的回合';
+  else if(md==1)xEl.innerHTML='',sEl.textContent='⚫ 黑棋回合';else io();}
+function odf(v){let hm=0;for(let y=0;y<N&&!hm;y++)for(let x=0;x<N&&!hm;x++)if(B[y][x])hm=1;if(hm){pdf=v;mEl.style.display='flex';}else df=v;}
+function closeModal(ok){mEl.style.display='none';if(ok){df=pdf;nb();dr();sEl.textContent='⚫ 你的回合';}else E('ds').value=df;}
+function goHome(){if(md==2)clr();E('home').style.display='block';E('game').style.display='none';xEl.innerHTML='';}
+function reset(){nb();sEl.className='';if(md==2){if(cl)cl.publish('gmk/'+rid,JSON.stringify({t:'reset',s:mc}));sEl.textContent=host?'已连接！你执 ⚫ 黑棋先手':'已连接！等待 ⚫ 黑棋落子';turn=1;rdy=1;}else sEl.textContent=md==0?'⚫ 你的回合':'⚫ 黑棋回合';dr();}
+
+// ── Click ──
+C.addEventListener('click',e=>{
+  if(over||(md==0&&turn!=1)||(md==2&&turn!=mc)||(md==2&&!rdy))return;
+  let x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
+  if(x<0||x>=N||y<0||y>=N||B[y][x])return;
+  mv(x,y);if(!over&&md==0)ai();if(!over&&md==2)sm(x,y);
 });
 
-function doMove(x,y){
-  b[y][x]=turn;lastX=x;lastY=y;stoneAnim=.05;animStone();playClick();
-  if(win(x,y,turn)){
-    let w=(turn===1?'⚫':'⚪');
-    if(mode===0)w+=turn===1?' 你获胜！':' AI 获胜！';
-    else if(mode===2)w+=turn===myColor?' 你获胜！':' 对手获胜！';
-    else w+=' 获胜！';
-    sEl.textContent=w;sEl.className='win';over=true;playWin();spawnParticles();return;
-  }
-  turn=turn===1?2:1;
-  if(mode===0)sEl.textContent=turn===1?'⚫ 你的回合':'⚪ AI 思考中...';
-  else if(mode===1)sEl.textContent=(turn===1?'⚫ 黑棋':'⚪ 白棋')+' 回合';
-  else sEl.textContent=(turn===myColor?'轮到你了':'等待对手...')+' ('+(turn===1?'⚫':'⚪')+')';
-  startPulse();
-}
-
-// ═══════════ Board utils ═══════════
-function get(x,y){return b[y]&&b[y][x]!=null?b[y][x]:-1}
-function evalBoard(){let t=0;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);return t;}
-function lineScore(x,y,p){
-  let t=0;
-  for(let[dx,dy]of D4){let c=0,o1=0,o2=0;for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}let e=o1+o2;if(c>=5)t+=5e7;else if(c===4&&e>=1)t+=2e6;else if(c===4&&e===0)t+=5e4;else if(c===3&&e===2)t+=8e4;else if(c===3&&e===1)t+=8000;else if(c===2&&e===2)t+=3000;else if(c===2&&e===1)t+=500;else if(c===1&&e===2)t+=200;}
-  return t;
-}
-function hasWin(p){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;if(w)return[x,y];}return null;}
-function hasFour(p){for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x])for(let[dx,dy]of D4){let c=0,o1=0,o2=0;b[y][x]=p;for(let i=1;i<=5;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)o1++;break}}for(let i=1;i<=5;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)o2++;break}}b[y][x]=0;if(c>=4&&(o1+o2)>=1)return[x,y];}return null;}
-function quickScore(x,y,p){let s=0;for(let[dx,dy]of D4){let c=0,e=0;for(let i=1;i<=4;i++){let v=get(x+dx*i,y+dy*i);if(v===p)c++;else{if(v===0)e++;break}}for(let i=1;i<=4;i++){let v=get(x-dx*i,y-dy*i);if(v===p)c++;else{if(v===0)e++;break}}if(c>=3&&e>=1)s+=5e4;else if(c===2&&e>=1)s+=2000;else if(c===1&&e>=1)s+=200;s+=c*10;}return s+(14-Math.abs(x-7)-Math.abs(y-7))*5;}
-function getMoves(rng){let set=new Set(),m=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])for(let dy=-rng;dy<=rng;dy++)for(let dx=-rng;dx<=rng;dx++){let ny=y+dy,nx=x+dx;if(nx>=0&&nx<N&&ny>=0&&ny<N&&!b[ny][nx])set.add(ny*N+nx);}if(!set.size){let c=7;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)set.add((c+dy)*N+(c+dx));}for(let k of set)m.push([k%N,Math.floor(k/N)]);return m;}
-
-// ═══════════ Minimax ═══════════
-function search(d,alpha,beta,mx){
-  nodes++;if(nodes%512===0&&Date.now()>deadline){aborted=true;return evalBoard();}
-  if(d<=0)return evalBoard();
-  let p=mx?2:1,moves=getMoves(1),scored=moves.map(([x,y])=>({x,y,s:quickScore(x,y,p)+quickScore(x,y,mx?1:2)*0.9}));scored.sort((a,b)=>b.s-a.s);
-  let bestV=mx?-Infinity:Infinity,any=false,limit=Math.min(scored.length,16);
-  for(let i=0;i<limit;i++){let{x,y}=scored[i];b[y][x]=p;if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1e3:(-1e8-d*1e3);}b[y][x]=0;b[y][x]=p;let sc=search(d-1,alpha,beta,!mx);b[y][x]=0;any=true;if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}if(alpha>=beta)break;if(aborted){if(any)return bestV;break;}}
-  if(!any)return evalBoard();return bestV;
-}
-
-// ═══════════ AI ═══════════
-function aiMove(){
-  setTimeout(()=>{if(mode!==0||over)return;
-    let bx=7,by=7;
-    let w=hasWin(2);if(w){doMove(w[0],w[1]);return;}
-    w=hasWin(1);if(w){doMove(w[0],w[1]);return;}
-    let f=hasFour(1);if(f){doMove(f[0],f[1]);return;}
-    let moves=getMoves(2),scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
-    if(diff===0){scored.sort((a,b)=>b.s-a.s);let pool=scored.slice(0,Math.max(8,scored.length>>2));let pick=pool[Math.floor(Math.random()*pool.length)];bx=pick.x;by=pick.y;}
-    else if(diff===1){let best=-Infinity;for(let{x,y,s:v}of scored)if(v>best){best=v;bx=x;by=y;}}
-    else{let maxDepth=diff===2?8:16,topN=diff===2?45:35,timeLimit=diff===2?2000:5000,startDepth=diff===2?2:4;scored.sort((a,b)=>b.s-a.s);let cands=scored.slice(0,topN),best=-Infinity;deadline=Date.now()+timeLimit;aborted=false;nodes=0;
-      for(let d=startDepth;d<=maxDepth&&!aborted;d+=2){let roundBest=-Infinity,rbx=bx,rby=by,n=d<=4?cands.length:Math.min(cands.length,20+Math.floor((maxDepth-d)*2));for(let i=0;i<n;i++){if(Date.now()>deadline){aborted=true;break;}let{x,y}=cands[i];b[y][x]=2;let sc=search(d-1,-Infinity,Infinity,false);b[y][x]=0;if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}}if(!aborted){best=roundBest;bx=rbx;by=rby;}if(!aborted&&d<maxDepth)for(let i=0;i<Math.min(8,cands.length);i++){b[cands[i].y][cands[i].x]=2;cands[i].s=search(Math.min(2,d-1),-Infinity,Infinity,false);b[cands[i].y][cands[i].x]=0;}if(!aborted)cands.sort((a,b)=>b.s-a.s);}}
-    if(!over)doMove(bx,by);
-  },50);
-}
-
-// ═══════════ Online (MQTT) ═══════════
-function initOnline(){
-  let params=new URLSearchParams(window.location.search),rid=params.get('room');
-  isHost=!rid;myColor=isHost?1:2;roomId=rid||Math.random().toString(36).substring(2,8).toUpperCase();
-  extraEl.innerHTML='房间: <b>'+roomId+'</b>'+(isHost?' <button id="share" onclick="shareRoom()">📋 分享房间</button>':'');
-  client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clientId:'gomoku_'+Math.random().toString(36).substring(2,10)});let topic='gomoku/'+roomId;
-  client.on('connect',()=>{client.subscribe(topic);sEl.textContent=isHost?'等待对手加入... (你执 ⚫)':'已加入！等待 ⚫ 黑棋落子';turn=1;onlineReady=false;});
-  client.on('message',(t,msg)=>{let d;try{d=JSON.parse(msg.toString());}catch(e){return;}if(d.s===myColor)return;if(d.t==='join'&&isHost){sEl.textContent='对手已加入！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;client.publish(topic,JSON.stringify({t:'ack',s:myColor}));}if(d.t==='ack'&&!isHost){sEl.textContent='已连接！等待 ⚫ 黑棋落子';onlineReady=true;}if(d.t==='reset'){newBoard();draw();sEl.className='';sEl.textContent=isHost?'你执 ⚫ 黑棋先手':'等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}if(d.t==='move'&&!over){let op=isHost?2:1;b[d.y][d.x]=op;lastX=d.x;lastY=d.y;turn=myColor;playClick();startPulse();draw();if(win(d.x,d.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';sEl.className='win';over=true;onlineReady=false;playWin();spawnParticles();return;}sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';}});
-  client.on('error',()=>{sEl.textContent='连接失败，请重试';onlineReady=false;});
-  if(!isHost)setTimeout(()=>{client.publish(topic,JSON.stringify({t:'join',s:myColor}));},800);
-}
-function shareRoom(){let base=location.href.split('?')[0];if(base.startsWith('file://'))base='https://darling02-syc.github.io/gomoku/';navigator.clipboard.writeText(base+'?room='+roomId).then(()=>{showToast('房间码已复制，分享给好友吧！');});}
-function sendMove(x,y){if(client)client.publish('gomoku/'+roomId,JSON.stringify({t:'move',x,y,s:myColor}));}
-function cleanupOnline(){if(client){client.end();client=null;}isHost=false;roomId='';onlineReady=false;}
-
-// ═══════════ Toast ═══════════
-function showToast(msg){toastEl.textContent=msg;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),2000);}
-
-// ═══════════ Navigation ═══════════
-function goHome(){if(mode===2)cleanupOnline();homeEl.style.display='block';gameEl.style.display='none';extraEl.innerHTML='';}
-function doReset(){newBoard();sEl.className='';if(mode===2){if(client)client.publish('gomoku/'+roomId,JSON.stringify({t:'reset',s:myColor}));if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;onlineReady=true;}else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;onlineReady=true;}}else if(mode===0){sEl.textContent='⚫ 你的回合';}else{sEl.textContent='⚫ 黑棋回合';}draw();}
-
-// ═══════════ Draw ═══════════
-function draw(){
-  ctx.fillStyle='#dcb468';ctx.fillRect(0,0,540,540);
-  ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
-  for(let i=0;i<N;i++){ctx.beginPath();ctx.moveTo(S/2,i*S+S/2);ctx.lineTo(540-S/2,i*S+S/2);ctx.stroke();ctx.beginPath();ctx.moveTo(i*S+S/2,S/2);ctx.lineTo(i*S+S/2,540-S/2);ctx.stroke();}
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x]){let cx=x*S+S/2,cy=y*S+S/2;ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);ctx.fillStyle=b[y][x]==1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();if(x===lastX&&y===lastY&&stoneAnim>=1){ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;}}
-}
-function win(x,y,p){for(let[dx,dy]of D4){let c=1;for(let i=1;i<5;i++)if(b[y+dy*i]&&b[y+dy*i][x+dx*i]===p)c++;else break;for(let i=1;i<5;i++)if(b[y-dy*i]&&b[y-dy*i][x-dx*i]===p)c++;else break;if(c>=5)return true;}return false;}
-
-newBoard();draw();
-if(new URLSearchParams(window.location.search).get('room'))startGame(2);
+nb();dr();if(new URLSearchParams(location.search).get('room'))start(2);
 </script></body></html>
