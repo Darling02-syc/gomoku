@@ -16,7 +16,7 @@ canvas{border:2px solid #8b7355;border-radius:4px;cursor:pointer}
 <script>
 const N=15,S=36,c=document.getElementById('c'),ctx=c.getContext('2d'),sEl=document.getElementById('s'),ds=document.getElementById('d');
 let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false,aiMode=true;
-let deadline=0,aborted=false,nodes=0,lastAIX=-1,lastAIY=-1;
+let deadline=0,aborted=false,nodes=0,lastBX=-1,lastBY=-1,lastWX=-1,lastWY=-1;
 const D4=[[1,0],[0,1],[1,1],[1,-1]];
 
 c.addEventListener('click',e=>{
@@ -24,11 +24,13 @@ c.addEventListener('click',e=>{
   if(aiMode&&turn!=1)return;
   const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
   if(x<0||x>=N||y<0||y>=N||b[y][x])return;
-  lastAIX=lastAIY=-1;place(x,y);if(!over&&aiMode)aiMove();
+  place(x,y);if(!over&&aiMode)aiMove();
 });
 
 function place(x,y){
-  b[y][x]=turn;draw();
+  b[y][x]=turn;
+  if(turn===1){lastBX=x;lastBY=y;}else{lastWX=x;lastWY=y;}
+  draw();
   if(win(x,y,turn)){sEl.textContent=(turn==1?'⚫':'⚪')+(aiMode?(turn==1?' 你':' AI'):'')+' 获胜！';over=true;return}
   turn=turn==1?2:1;
   sEl.textContent=aiMode?(turn==1?'⚫ 你的回合':'⚪ AI 思考中...'):(turn==1?'⚫ 黑棋回合':'⚪ 白棋回合');
@@ -201,7 +203,7 @@ function aiMove(){
   },50);
 }
 
-function setAI(x,y){lastAIX=x;lastAIY=y;if(!over)place(x,y);}
+function setAI(x,y){if(!over)place(x,y);}
 
 // ── Draw ──
 function draw(){
@@ -212,8 +214,8 @@ function draw(){
     let cx=x*S+S/2,cy=y*S+S/2;
     ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);
     ctx.fillStyle=b[y][x]==1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
-    // Highlight last AI move
-    if(x===lastAIX&&y===lastAIY){
+    // Highlight last move for each color
+    if((x===lastBX&&y===lastBY)||(x===lastWX&&y===lastWY)){
       ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);
       ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;
     }
@@ -226,14 +228,14 @@ function win(x,y,p){
 }
 
 document.getElementById('r').addEventListener('click',()=>{
-  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastAIX=lastAIY=-1;
+  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastBX=lastBY=lastWX=lastWY=-1;
   sEl.textContent=aiMode?'⚫ 你的回合':'⚫ 黑棋回合';draw();
 });
 const ab=document.getElementById('a');
 ab.addEventListener('click',()=>{
   aiMode=!aiMode;ab.textContent=aiMode?'双人模式':'AI 对战';
   sEl.textContent=aiMode?'⚫ 你的回合':'⚫ 黑棋回合';
-  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastAIX=lastAIY=-1;draw();
+  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastBX=lastBY=lastWX=lastWY=-1;draw();
 });
 draw();
 </script></body></html>
