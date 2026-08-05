@@ -4,39 +4,61 @@
 body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#2c2c2c;font-family:Arial}
 #g{text-align:center}
 canvas{border:2px solid #8b7355;border-radius:4px;cursor:pointer}
-#s{color:#ccc;margin-top:12px;font-size:18px}
-#r,#a,select{color:#fff;border:none;padding:8px 16px;font-size:16px;border-radius:4px;cursor:pointer;margin:8px 4px 0;background:#555}
+#s{color:#ccc;margin:12px 0;font-size:18px;min-height:24px}
+#s a{color:#6bc;word-break:break-all}
+#r,#a,#cp,select{color:#fff;border:none;padding:8px 16px;font-size:16px;border-radius:4px;cursor:pointer;margin:8px 4px 0;background:#555}
 #r{background:#6b9b6b}#r:hover{background:#5a8a5a}
 #a{background:#6b6b9b}#a:hover{background:#5a5a8a}
+#cp{background:#9b6b6b;display:none}#cp:hover{background:#8a5a5a}
 </style></head><body>
 <div id="g"><canvas id="c" width="540" height="540"></canvas>
 <div id="s">⚫ 你的回合</div>
-<button id="r">重新开始</button><button id="a">双人模式</button>
+<button id="r">重新开始</button><button id="a">本地双人</button><button id="cp">📋 复制链接</button>
 <select id="d"><option value="0">🐣 简单</option><option value="1" selected>🤖 中等</option><option value="2">👹 困难</option><option value="3">💀 地狱</option></select></div>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@0.5.3/dist/peerjs.min.js"></script>
 <script>
 const N=15,S=36,c=document.getElementById('c'),ctx=c.getContext('2d'),sEl=document.getElementById('s'),ds=document.getElementById('d');
-let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false,aiMode=true;
-let deadline=0,aborted=false,nodes=0,lastX=-1,lastY=-1;
 const D4=[[1,0],[0,1],[1,1],[1,-1]];
+let b=Array(N).fill().map(()=>Array(N).fill(0)),turn=1,over=false;
+let deadline=0,aborted=false,nodes=0,lastX=-1,lastY=-1;
+// mode: 0=AI, 1=Local 2P, 2=Online
+let mode=0,peer=null,conn=null,isHost=false,roomId='',myColor=1;
 
+// ── Click handler ──
 c.addEventListener('click',e=>{
   if(over)return;
-  if(aiMode&&turn!=1)return;
+  if(mode===0&&turn!=1)return;        // AI mode: only player's turn
+  if(mode===2&&turn!==myColor)return; // Online: only your turn
+  if(mode===2&&!conn)return;          // Online: must be connected
   const x=Math.round((e.offsetX-18)/S),y=Math.round((e.offsetY-18)/S);
   if(x<0||x>=N||y<0||y>=N||b[y][x])return;
-  place(x,y);if(!over&&aiMode)aiMove();
+  place(x,y);
+  if(!over&&mode===0)aiMove();
+  if(!over&&mode===2)sendMove(x,y);
 });
 
-function place(x,y){
-  b[y][x]=turn;lastX=x;lastY=y;
-  draw();
-  if(win(x,y,turn)){sEl.textContent=(turn==1?'⚫':'⚪')+(aiMode?(turn==1?' 你':' AI'):'')+' 获胜！';over=true;return}
-  turn=turn==1?2:1;
-  sEl.textContent=aiMode?(turn==1?'⚫ 你的回合':'⚪ AI 思考中...'):(turn==1?'⚫ 黑棋回合':'⚪ 白棋回合');
+function place(x,y,fromRemote){
+  b[y][x]=turn;lastX=x;lastY=y;draw();
+  if(win(x,y,turn)){
+    let w=turn===1?'⚫':'⚪';
+    if(mode===0)w+=turn===1?' 你':' AI';
+    else if(mode===2)w+=turn===myColor?' 你':' 对手';
+    sEl.textContent=w+' 获胜！';over=true;return;
+  }
+  turn=turn===1?2:1;
+  if(mode===0)sEl.textContent=turn===1?'⚫ 你的回合':'⚪ AI 思考中...';
+  else if(mode===1)sEl.textContent=(turn===1?'⚫ 黑棋':'⚪ 白棋')+' 回合';
+  else sEl.textContent=(turn===myColor?'轮到你了':'等待对手...')+' ('+(turn===1?'⚫':'⚪')+')';
 }
 
+// ── Board utilities ──
 function get(x,y){return b[y]&&b[y][x]!=null?b[y][x]:-1}
-
+function evalBoard(){
+  let t=0;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
+    t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);
+  return t;
+}
 function lineScore(x,y,p){
   let t=0;
   for(let[dx,dy]of D4){
@@ -55,14 +77,6 @@ function lineScore(x,y,p){
   }
   return t;
 }
-
-function evalBoard(){
-  let t=0;
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
-    t+=b[y][x]===2?lineScore(x,y,2):-lineScore(x,y,1);
-  return t;
-}
-
 function hasWin(p){
   for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!b[y][x]){b[y][x]=p;let w=win(x,y,p);b[y][x]=0;if(w)return[x,y];}
   return null;
@@ -79,7 +93,6 @@ function hasFour(p){
   }
   return null;
 }
-
 function quickScore(x,y,p){
   let s=0;
   for(let[dx,dy]of D4){
@@ -93,7 +106,6 @@ function quickScore(x,y,p){
   }
   return s+(14-Math.abs(x-7)-Math.abs(y-7))*5;
 }
-
 function getMoves(rng){
   let set=new Set(),m=[];
   for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x])
@@ -106,29 +118,21 @@ function getMoves(rng){
   return m;
 }
 
-// ── Search with single deadline ──
+// ── Minimax search ──
 function search(d,alpha,beta,mx){
   nodes++;
   if(nodes%512===0&&Date.now()>deadline){aborted=true;return evalBoard();}
   if(d<=0)return evalBoard();
-
   let p=mx?2:1,moves=getMoves(1);
   let scored=moves.map(([x,y])=>({x,y,s:quickScore(x,y,p)+quickScore(x,y,mx?1:2)*0.9}));
   scored.sort((a,b)=>b.s-a.s);
-
   let bestV=mx?-Infinity:Infinity,any=false;
   let limit=Math.min(scored.length,16);
-
   for(let i=0;i<limit;i++){
     let{x,y}=scored[i];
-    b[y][x]=p;
-    if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1e3:(-1e8-d*1e3);}
+    b[y][x]=p;if(win(x,y,p)){b[y][x]=0;return mx?1e8+d*1e3:(-1e8-d*1e3);}
     b[y][x]=0;
-
-    b[y][x]=p;
-    let sc=search(d-1,alpha,beta,!mx);
-    b[y][x]=0;any=true;
-
+    b[y][x]=p;let sc=search(d-1,alpha,beta,!mx);b[y][x]=0;any=true;
     if(mx){if(sc>bestV)bestV=sc;if(bestV>alpha)alpha=bestV;}
     else{if(sc<bestV)bestV=sc;if(bestV<beta)beta=bestV;}
     if(alpha>=beta)break;
@@ -138,58 +142,40 @@ function search(d,alpha,beta,mx){
   return bestV;
 }
 
-// ── AI entry ──
+// ── AI ──
 function aiMove(){
   setTimeout(()=>{
+    if(mode!==0||over)return;
     let lv=+ds.value,bx=7,by=7;
-
-    // Always check instant win/block first (all levels)
-    let w=hasWin(2);if(w){setAI(w[0],w[1]);return;}
-    w=hasWin(1);if(w){setAI(w[0],w[1]);return;}
-    let f=hasFour(1);if(f){setAI(f[0],f[1]);return;}
-
+    let w=hasWin(2);if(w){place(w[0],w[1]);return;}
+    w=hasWin(1);if(w){place(w[0],w[1]);return;}
+    let f=hasFour(1);if(f){place(f[0],f[1]);return;}
     let moves=getMoves(2);
     let scored=moves.map(([x,y])=>({x,y,s:lineScore(x,y,2)+lineScore(x,y,1)*0.9}));
-
     if(lv===0){
-      // ── Simple: random among "ok" moves ──
       scored.sort((a,b)=>b.s-a.s);
       let pool=scored.slice(0,Math.max(8,scored.length>>2));
       let pick=pool[Math.floor(Math.random()*pool.length)];
       bx=pick.x;by=pick.y;
     }else if(lv===1){
-      // ── Medium: pure heuristic ──
       let best=-Infinity;
       for(let{x,y,s:v}of scored)if(v>best){best=v;bx=x;by=y;}
     }else{
-      // ── Hard / Hell: iterative deepening, single deadline ──
-      let maxDepth=lv===2?8:16;
-      let topN=lv===2?45:35;
-      let timeLimit=lv===2?2000:5000;
-      let startDepth=lv===2?2:4;
-
+      let maxDepth=lv===2?8:16,topN=lv===2?45:35;
+      let timeLimit=lv===2?2000:5000,startDepth=lv===2?2:4;
       scored.sort((a,b)=>b.s-a.s);
-      let cands=scored.slice(0,topN);
-      let best=-Infinity;
-      deadline=Date.now()+timeLimit;
-      aborted=false;
-      nodes=0;
-
+      let cands=scored.slice(0,topN),best=-Infinity;
+      deadline=Date.now()+timeLimit;aborted=false;nodes=0;
       for(let d=startDepth;d<=maxDepth&&!aborted;d+=2){
         let roundBest=-Infinity,rbx=bx,rby=by;
-        // Deeper iterations search fewer but most-promising candidates
         let n=d<=4?cands.length:Math.min(cands.length,20+Math.floor((maxDepth-d)*2));
-
         for(let i=0;i<n;i++){
           if(Date.now()>deadline){aborted=true;break;}
-          let{x,y}=cands[i];
-          b[y][x]=2;
-          let sc=search(d-1,-Infinity,Infinity,false);
-          b[y][x]=0;
+          let{x,y}=cands[i];b[y][x]=2;
+          let sc=search(d-1,-Infinity,Infinity,false);b[y][x]=0;
           if(!aborted&&sc>roundBest){roundBest=sc;rbx=x;rby=y;}
         }
         if(!aborted){best=roundBest;bx=rbx;by=rby;}
-        // Promote top performers to front for next iteration
         if(!aborted&&d<maxDepth)for(let i=0;i<Math.min(8,cands.length);i++){
           b[cands[i].y][cands[i].x]=2;
           cands[i].s=search(Math.min(2,d-1),-Infinity,Infinity,false);
@@ -198,11 +184,69 @@ function aiMove(){
         if(!aborted)cands.sort((a,b)=>b.s-a.s);
       }
     }
-    setAI(bx,by);
+    if(!over)place(bx,by);
   },50);
 }
 
-function setAI(x,y){if(!over)place(x,y);}
+// ── Online ──
+function initOnline(){
+  let params=new URLSearchParams(window.location.search);
+  let rid=params.get('room');
+  if(rid){joinRoom(rid);}else{createRoom();}
+}
+
+function createRoom(){
+  isHost=true;myColor=1;roomId=Math.random().toString(36).substring(2,8).toUpperCase();
+  peer=new Peer(roomId,{host:'0.peerjs.com',port:443,secure:true,debug:0});
+  peer.on('open',()=>{
+    let link=location.origin+location.pathname+'?room='+roomId;
+    sEl.innerHTML='等待对手加入...<br><small>房间码: <b>'+roomId+'</b></small>';
+    document.getElementById('cp').style.display='inline-block';
+    document.getElementById('cp').onclick=()=>{navigator.clipboard.writeText(link).then(()=>{sEl.textContent='链接已复制！发送给好友即可';setTimeout(()=>{sEl.innerHTML='等待对手加入...<br><small>房间码: <b>'+roomId+'</b></small>';},1500);});};
+  });
+  peer.on('connection',c=>{conn=c;setupConn();});
+  peer.on('error',()=>{sEl.textContent='连接失败，请重试';});
+}
+
+function joinRoom(rid){
+  isHost=false;myColor=2;roomId=rid;
+  peer=new Peer({host:'0.peerjs.com',port:443,secure:true,debug:0});
+  peer.on('open',()=>{
+    sEl.textContent='正在加入房间 '+rid+'...';
+    conn=peer.connect(rid,{reliable:true});
+    setupConn();
+  });
+  peer.on('error',()=>{sEl.textContent='加入失败，请检查房间码是否正确';});
+}
+
+function setupConn(){
+  function onOpen(){
+    if(isHost){sEl.textContent='已连接！你执 ⚫ 黑棋先手';turn=1;}
+    else{sEl.textContent='已连接！等待 ⚫ 黑棋落子';turn=1;}
+  }
+  if(conn.open){onOpen();}else{conn.on('open',onOpen);}
+  conn.on('data',data=>{
+    if(data.t==='move'&&!over){
+      // Apply opponent's move
+      let op=isHost?2:1;
+      b[data.y][data.x]=op;lastX=data.x;lastY=data.y;turn=myColor;draw();
+      if(win(data.x,data.y,op)){sEl.textContent=(op===1?'⚫':'⚪')+' 对手获胜！';over=true;return;}
+      sEl.textContent='轮到你了 ('+(myColor===1?'⚫':'⚪')+')';
+    }
+  });
+  conn.on('close',()=>{sEl.textContent='连接已断开';conn=null;});
+}
+
+function sendMove(x,y){
+  if(conn)conn.send({t:'move',x:x,y:y});
+}
+
+function cleanupOnline(){
+  if(conn){conn.close();conn=null;}
+  if(peer){peer.destroy();peer=null;}
+  isHost=false;roomId='';
+  document.getElementById('cp').style.display='none';
+}
 
 // ── Draw ──
 function draw(){
@@ -212,29 +256,38 @@ function draw(){
   for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(b[y][x]){
     let cx=x*S+S/2,cy=y*S+S/2;
     ctx.beginPath();ctx.arc(cx,cy,S/2-2,0,Math.PI*2);
-    ctx.fillStyle=b[y][x]==1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
-    // Highlight last move
+    ctx.fillStyle=b[y][x]===1?'#000':'#fff';ctx.fill();ctx.strokeStyle='#333';ctx.stroke();
     if(x===lastX&&y===lastY){
       ctx.beginPath();ctx.arc(cx,cy,S/2-1,0,Math.PI*2);
       ctx.strokeStyle='#e74c3c';ctx.lineWidth=2.5;ctx.stroke();ctx.lineWidth=1;
     }
   }
 }
-
 function win(x,y,p){
   for(let[dx,dy]of D4){let c=1;for(let i=1;i<5;i++)if(b[y+dy*i]&&b[y+dy*i][x+dx*i]===p)c++;else break;for(let i=1;i<5;i++)if(b[y-dy*i]&&b[y-dy*i][x-dx*i]===p)c++;else break;if(c>=5)return true;}
   return false;
 }
-
-document.getElementById('r').addEventListener('click',()=>{
+function reset(){
   b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;
-  sEl.textContent=aiMode?'⚫ 你的回合':'⚫ 黑棋回合';draw();
+}
+
+// ── Buttons ──
+document.getElementById('r').addEventListener('click',()=>{
+  reset();
+  if(mode===0)sEl.textContent='⚫ 你的回合';
+  else if(mode===1)sEl.textContent='⚫ 黑棋回合';
+  else{cleanupOnline();initOnline();}
+  draw();
 });
 const ab=document.getElementById('a');
 ab.addEventListener('click',()=>{
-  aiMode=!aiMode;ab.textContent=aiMode?'双人模式':'AI 对战';
-  sEl.textContent=aiMode?'⚫ 你的回合':'⚫ 黑棋回合';
-  b=Array(N).fill().map(()=>Array(N).fill(0));turn=1;over=false;lastX=lastY=-1;draw();
+  if(mode===2)cleanupOnline();
+  mode=(mode+1)%3;
+  reset();
+  if(mode===0){ab.textContent='本地双人';ds.style.display='';sEl.textContent='⚫ 你的回合';}
+  else if(mode===1){ab.textContent='线上对战';ds.style.display='';sEl.textContent='⚫ 黑棋回合';}
+  else{ab.textContent='AI 对战';ds.style.display='none';initOnline();}
+  draw();
 });
 draw();
 </script></body></html>
